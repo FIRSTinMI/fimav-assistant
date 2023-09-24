@@ -1,28 +1,12 @@
 /* eslint global-require: off, no-console: off, promise/always-return: off */
-
-/**
- * This module executes inside of electron's main process. You can start
- * electron renderer process from here and communicate with the other processes
- * through IPC.
- *
- * When running `npm run build` or `npm run build:main`, this file is compiled to
- * `./src/main.js` using webpack. This gives us some performance wins.
- */
 import path from 'path';
-import {
-  app,
-  BrowserWindow,
-  shell,
-  ipcMain,
-  Tray,
-  Menu,
-  globalShortcut,
-} from 'electron';
+import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu';
 import { resolveHtmlPath } from './util';
 import { registerAllEvents } from './register-events';
+import buildTray from './window_components/tray';
 
 class AppUpdater {
   constructor() {
@@ -33,7 +17,6 @@ class AppUpdater {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let tray = null;
 let appIsQuitting = false;
 
 ipcMain.on('ipc-example', async (event, arg) => {
@@ -135,10 +118,6 @@ const createWindow = async () => {
   new AppUpdater();
 };
 
-/**
- * Add event listeners...
- */
-
 app.on('window-all-closed', () => {
   app.quit();
 });
@@ -158,21 +137,7 @@ app
     }
 
     // Register Tray Icon
-    tray = new Tray(path.join(RESOURCES_PATH, 'icon.png'));
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: 'Show AV Assistant',
-        type: 'normal',
-        click: () => mainWindow?.show(),
-      },
-    ]);
-    let tooltip = 'FIM AV Assistant\n';
-    tooltip += `Version: ${app.getVersion()}\n`;
-    tooltip += 'FMS IP: 10.0.100.5\n';
-    tooltip += 'AV Internet IP: Unknown\n';
-    tooltip += 'AV Field IP: Unknown';
-    tray.setToolTip(tooltip);
-    tray.setContextMenu(contextMenu);
+    buildTray(mainWindow, RESOURCES_PATH, app.getVersion());
 
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
