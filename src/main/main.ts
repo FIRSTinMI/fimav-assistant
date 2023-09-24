@@ -80,7 +80,7 @@ const BACKGROUND_THREAD_PATH = app.isPackaged
   ? path.join(process.resourcesPath, 'src/main/backgroundThread.js')
   : path.join(__dirname, '../../.erb/dll/main/backgroundThread.js');
 
-const getAssetPath = (...paths: string[]): string => {
+const getResourcePath = (...paths: string[]): string => {
   return path.join(RESOURCES_PATH, ...paths);
 };
 
@@ -93,7 +93,7 @@ const createWindow = async () => {
     show: false,
     width: 1024,
     height: 728,
-    icon: getAssetPath('icon.png'),
+    icon: getResourcePath('icon.png'),
     webPreferences: {
       preload: app.isPackaged
         ? path.join(__dirname, 'preload.js')

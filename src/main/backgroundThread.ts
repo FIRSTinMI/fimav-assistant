@@ -24,6 +24,14 @@ const conn = new HubConnectionBuilder()
     .withAutomaticReconnect()
     .build();
 
+conn.on('MatchStatusInfoChanged', (info) => {
+    parent.postMessage('match status info changed');
+    if (info.p1 === 'GameSpecificData') {
+        parent.postMessage('====== start recording');
+        vmixService.StartRecording();
+    }
+});
+
 conn.on('SystemConfigValueChanged', async (configKey) => {
     parent.postMessage(`got a config value change ${configKey}`);
     // VideoSwitchOption
@@ -42,13 +50,7 @@ conn.on('SystemConfigValueChanged', async (configKey) => {
     }
 });
 
-conn.on('MatchStatusInfoChanged', (info) => {
-    parent.postMessage('match status info changed');
-    if (info.p1 === 'GameSpecificData') {
-        parent.postMessage('====== start recording');
-        vmixService.StopRecording();
-    }
-});
-async () => {
-    await conn.start();   
-}
+(async () => {
+    await conn.start();
+    parent.postMessage('started websocket');
+})();
