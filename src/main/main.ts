@@ -10,13 +10,13 @@
  */
 import path from 'path';
 import {
-  app,
-  BrowserWindow,
-  shell,
-  ipcMain,
-  Tray,
-  Menu,
-  globalShortcut,
+    app,
+    BrowserWindow,
+    shell,
+    ipcMain,
+    Tray,
+    Menu,
+    globalShortcut,
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
@@ -73,57 +73,57 @@ const installExtensions = async () => {
 };
 
 const RESOURCES_PATH = app.isPackaged
-  ? path.join(process.resourcesPath, 'assets')
-  : path.join(__dirname, '../../assets');
+    ? path.join(process.resourcesPath, 'assets')
+    : path.join(__dirname, '../../assets');
 
 const BACKGROUND_THREAD_PATH = app.isPackaged
-  ? path.join(process.resourcesPath, 'src/main/backgroundThread.js')
-  : path.join(__dirname, '../../.erb/dll/main/backgroundThread.js');
+    ? path.join(process.resourcesPath, 'src/main/backgroundThread.js')
+    : path.join(__dirname, '../../.erb/dll/autoav/background_threads/autoav.js');
 
 const getResourcePath = (...paths: string[]): string => {
-  return path.join(RESOURCES_PATH, ...paths);
+    return path.join(RESOURCES_PATH, ...paths);
 };
 
 const createWindow = async () => {
-  if (isDebug) {
-    await installExtensions();
-  }
-
-  mainWindow = new BrowserWindow({
-    show: false,
-    width: 1024,
-    height: 728,
-    icon: getResourcePath('icon.png'),
-    webPreferences: {
-      preload: app.isPackaged
-        ? path.join(__dirname, 'preload.js')
-        : path.join(__dirname, '../../.erb/dll/preload.js'),
-    },
-  });
-
-  mainWindow.loadURL(resolveHtmlPath('index.html'));
-
-  mainWindow.on('ready-to-show', () => {
-    if (!mainWindow) {
-      throw new Error('"mainWindow" is not defined');
+    if (isDebug) {
+        await installExtensions();
     }
-  });
 
-  mainWindow.on('minimize', (event: any) => {
-    event.preventDefault();
-    mainWindow?.hide();
-  });
+    mainWindow = new BrowserWindow({
+        show: false,
+        width: 1024,
+        height: 728,
+        icon: getResourcePath('icon.png'),
+        webPreferences: {
+            preload: app.isPackaged
+                ? path.join(__dirname, 'preload.js')
+                : path.join(__dirname, '../../.erb/dll/preload.js'),
+        },
+    });
 
-  mainWindow.on('close', (event) => {
-    if (!appIsQuitting) {
-      event.preventDefault();
-      mainWindow?.hide();
-      return false;
-    }
-    mainWindow?.destroy();
+    mainWindow.loadURL(resolveHtmlPath('index.html'));
 
-    return true;
-  });
+    mainWindow.on('ready-to-show', () => {
+        if (!mainWindow) {
+            throw new Error('"mainWindow" is not defined');
+        }
+    });
+
+    mainWindow.on('minimize', (event: any) => {
+        event.preventDefault();
+        mainWindow?.hide();
+    });
+
+    mainWindow.on('close', (event) => {
+        if (!appIsQuitting) {
+            event.preventDefault();
+            mainWindow?.hide();
+            return false;
+        }
+        mainWindow?.destroy();
+
+        return true;
+    });
 
     const getAssetPath = (...paths: string[]): string => {
         return path.join(RESOURCES_PATH, ...paths);
@@ -175,54 +175,54 @@ const createWindow = async () => {
  */
 
 app.on('window-all-closed', () => {
-  app.quit();
+    app.quit();
 });
 
 app
-  .whenReady()
-  .then(() => {
-    createWindow();
+    .whenReady()
+    .then(() => {
+        createWindow();
 
-    // Register Shortcuts
-    if (!app.isPackaged) {
-      // Ctrl + Q to quit
-      globalShortcut.register('CommandOrControl+Q', () => {
-        appIsQuitting = true;
-        app.quit();
-      });
-    }
+        // Register Shortcuts
+        if (!app.isPackaged) {
+            // Ctrl + Q to quit
+            globalShortcut.register('CommandOrControl+Q', () => {
+                appIsQuitting = true;
+                app.quit();
+            });
+        }
 
-    // Register Tray Icon
-    tray = new Tray(path.join(RESOURCES_PATH, 'icon.png'));
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: 'Show AV Assistant',
-        type: 'normal',
-        click: () => mainWindow?.show(),
-      },
-    ]);
-    let tooltip = 'FIM AV Assistant\n';
-    tooltip += `Version: ${app.getVersion()}\n`;
-    tooltip += 'FMS IP: 10.0.100.5\n';
-    tooltip += 'AV Internet IP: Unknown\n';
-    tooltip += 'AV Field IP: Unknown';
-    tray.setToolTip(tooltip);
-    tray.setContextMenu(contextMenu);
+        // Register Tray Icon
+        tray = new Tray(path.join(RESOURCES_PATH, 'icon.png'));
+        const contextMenu = Menu.buildFromTemplate([
+            {
+                label: 'Show AV Assistant',
+                type: 'normal',
+                click: () => mainWindow?.show(),
+            },
+        ]);
+        let tooltip = 'FIM AV Assistant\n';
+        tooltip += `Version: ${app.getVersion()}\n`;
+        tooltip += 'FMS IP: 10.0.100.5\n';
+        tooltip += 'AV Internet IP: Unknown\n';
+        tooltip += 'AV Field IP: Unknown';
+        tray.setToolTip(tooltip);
+        tray.setContextMenu(contextMenu);
 
-    const worker = new Worker(BACKGROUND_THREAD_PATH);
+        const worker = new Worker(BACKGROUND_THREAD_PATH);
 
-    worker.on('message', (msg: string) => {
-        console.log('From worker:', msg);
-    });
+        worker.on('message', (msg: string) => {
+            console.log('From worker:', msg);
+        });
 
-    worker.on('error', (msg: string) => {
-        console.error('From worker:', msg);
-    });
+        worker.on('error', (msg: string) => {
+            console.error('From worker:', msg);
+        });
 
-    app.on('activate', () => {
-      // On macOS it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
-      if (mainWindow === null) createWindow();
-    });
-  })
-  .catch(console.log);
+        app.on('activate', () => {
+            // On macOS it's common to re-create a window in the app when the
+            // dock icon is clicked and there are no other windows open.
+            if (mainWindow === null) createWindow();
+        });
+    })
+    .catch(console.log);
