@@ -5,5 +5,4 @@ export default interface HWCheckResponse {
     venue_static_ip?: string;
     av_static_ip?: string;
     unofficial_hw: boolean;
-
 }
