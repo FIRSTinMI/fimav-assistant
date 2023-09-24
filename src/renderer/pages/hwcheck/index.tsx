@@ -18,16 +18,18 @@ const HWCheck = ({ nextStep, previousStep }: Steppable) => {
     const [networkReady, setNetworkReady] = useState(ReadyState.NotReady);
     const [ipReady, setIpReady] = useState(ReadyState.NotReady);
     const [audioReady, setAudioReady] = useState(ReadyState.NotReady);
+    const [errors, setErrors] = useState<string[]>([]);
 
     useEffect(() => {
         // Fire off HW check and register listener
         window.electron.ipcRenderer.once<HWCheckResponse>('hwcheck-response', (arg: HWCheckResponse) => {
-            setNetworkReady(arg.network_ready ? ReadyState.Ready : ReadyState.Error);
-            setIpReady(arg.ip_ready ? ReadyState.Ready : ReadyState.Error);
+            setNetworkReady(arg.av_ip_ready && arg.field_ip_ready && arg.venue_ip_ready ? ReadyState.Ready : ReadyState.Error);
+            setIpReady(arg.nics_found.length > 3 ? ReadyState.Ready : ReadyState.Error);
             setAudioReady(arg.audio_ready ? ReadyState.Ready : ReadyState.Error);
+            setErrors(arg.errors);
         });
         window.electron.ipcRenderer.sendMessage('hwcheck', []);
-    });
+    }, []); // only run once
 
     const ReadyHandeler = ({ ready }: { ready: ReadyState }) => {
         switch (ready) {
@@ -50,6 +52,10 @@ const HWCheck = ({ nextStep, previousStep }: Steppable) => {
                 <Typography.Text><ReadyHandeler ready={networkReady} />  Network Adapters</Typography.Text>
                 <Typography.Text><ReadyHandeler ready={ipReady} /> IP Addresses</Typography.Text>
                 <Typography.Text><ReadyHandeler ready={audioReady} /> Audio Devices</Typography.Text>
+
+                {errors && errors.length > 0 && 
+                    errors.map(error => <Typography.Text type="danger">{error}</Typography.Text>)
+                }
 
                 {/* Meanwhile, locate your AV Totes */}
                 <Typography.Title level={3}>Meanwhile, please locate your 2 AV Totes and 2 small camera pelicans. They are pictured below.</Typography.Title>
