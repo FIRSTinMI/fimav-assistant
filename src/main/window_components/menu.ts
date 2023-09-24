@@ -4,6 +4,7 @@ import {
   shell,
   BrowserWindow,
   MenuItemConstructorOptions,
+  MenuItem,
 } from 'electron';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
@@ -19,14 +20,11 @@ export default class MenuBuilder {
   }
 
   buildMenu(): Menu {
-    if (
+    const isDev =
       process.env.NODE_ENV === 'development' ||
-      process.env.DEBUG_PROD === 'true'
-    ) {
-      this.setupDevelopmentEnvironment();
-    }
+      process.env.DEBUG_PROD === 'true';
 
-    const template = this.buildDefaultTemplate();
+    const template = this.buildDefaultTemplate(isDev);
 
     const menu = Menu.buildFromTemplate(template);
     Menu.setApplicationMenu(menu);
@@ -34,23 +32,8 @@ export default class MenuBuilder {
     return menu;
   }
 
-  setupDevelopmentEnvironment(): void {
-    this.mainWindow.webContents.on('context-menu', (_, props) => {
-      const { x, y } = props;
-
-      Menu.buildFromTemplate([
-        {
-          label: 'Inspect element',
-          click: () => {
-            this.mainWindow.webContents.inspectElement(x, y);
-          },
-        },
-      ]).popup({ window: this.mainWindow });
-    });
-  }
-
-  buildDefaultTemplate() {
-    const templateDefault = [
+  buildDefaultTemplate(dev: boolean) {
+    const templateDefault: any = [
       {
         label: 'About',
         submenu: [
@@ -59,10 +42,32 @@ export default class MenuBuilder {
             click() {
               shell.openExternal('https://www.firstinmichigan.org');
             },
-          }
+          },
         ],
       },
     ];
+
+    if (dev) {
+      templateDefault.push({
+        label: 'Debug',
+        submenu: [
+          {
+            label: 'Reload',
+            accelerator: 'CommandOrControl+R',
+            click: () => {
+              this.mainWindow.webContents.reload();
+            },
+          },
+          {
+            label: 'Toggle Developer Tools',
+            accelerator: 'Alt+CommandOrControl+I',
+            click: () => {
+              this.mainWindow.webContents.toggleDevTools();
+            },
+          },
+        ],
+      });
+    }
 
     return templateDefault;
   }

@@ -9,10 +9,18 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain, Tray, Menu } from 'electron';
+import {
+  app,
+  BrowserWindow,
+  shell,
+  ipcMain,
+  Tray,
+  Menu,
+  globalShortcut,
+} from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
-import MenuBuilder from './menu';
+import MenuBuilder from './window_components/menu';
 import { resolveHtmlPath } from './util';
 import { registerAllEvents } from './register-events';
 
@@ -26,6 +34,7 @@ class AppUpdater {
 
 let mainWindow: BrowserWindow | null = null;
 let tray = null;
+let appIsQuitting = false;
 
 ipcMain.on('ipc-example', async (event, arg) => {
   const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
@@ -96,11 +105,20 @@ const createWindow = async () => {
     mainWindow.focus();
   });
 
-  mainWindow.on('close', (event) => {
+  mainWindow.on('minimize', (event: any) => {
     event.preventDefault();
-    if (mainWindow) mainWindow.hide();
+    mainWindow?.hide();
+  });
 
-    return false;
+  mainWindow.on('close', (event) => {
+    if (!appIsQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+      return false;
+    }
+    mainWindow?.destroy();
+
+    return true;
   });
 
   const menuBuilder = new MenuBuilder(mainWindow);
@@ -122,17 +140,22 @@ const createWindow = async () => {
  */
 
 app.on('window-all-closed', () => {
-  // Respect the OSX convention of having the application in memory even
-  // after all windows have been closed
-  // if (process.platform !== 'darwin') {
-  //   app.quit();
-  // }
+  app.quit();
 });
 
 app
   .whenReady()
   .then(() => {
     createWindow();
+
+    // Register Shortcuts
+    if (!app.isPackaged) {
+      // Ctrl + Q to quit
+      globalShortcut.register('CommandOrControl+Q', () => {
+        appIsQuitting = true;
+        app.quit();
+      });
+    }
 
     // Register Tray Icon
     tray = new Tray(path.join(RESOURCES_PATH, 'icon.png'));
