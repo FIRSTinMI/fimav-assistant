@@ -9,7 +9,7 @@
  * `./src/main.js` using webpack. This gives us some performance wins.
  */
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, Tray, Menu } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './menu';
@@ -25,6 +25,7 @@ class AppUpdater {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let tray = null;
 
 ipcMain.on('ipc-example', async (event, arg) => {
   const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
@@ -60,18 +61,18 @@ const installExtensions = async () => {
     .catch(console.log);
 };
 
+const RESOURCES_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'assets')
+  : path.join(__dirname, '../../assets');
+
+const getAssetPath = (...paths: string[]): string => {
+  return path.join(RESOURCES_PATH, ...paths);
+};
+
 const createWindow = async () => {
   if (isDebug) {
     await installExtensions();
   }
-
-  const RESOURCES_PATH = app.isPackaged
-    ? path.join(process.resourcesPath, 'assets')
-    : path.join(__dirname, '../../assets');
-
-  const getAssetPath = (...paths: string[]): string => {
-    return path.join(RESOURCES_PATH, ...paths);
-  };
 
   mainWindow = new BrowserWindow({
     show: false,
@@ -95,8 +96,11 @@ const createWindow = async () => {
     mainWindow.focus();
   });
 
-  mainWindow.on('closed', () => {
-    mainWindow = null;
+  mainWindow.on('close', (event) => {
+    event.preventDefault();
+    if (mainWindow) mainWindow.hide();
+
+    return false;
   });
 
   const menuBuilder = new MenuBuilder(mainWindow);
@@ -120,15 +124,33 @@ const createWindow = async () => {
 app.on('window-all-closed', () => {
   // Respect the OSX convention of having the application in memory even
   // after all windows have been closed
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // if (process.platform !== 'darwin') {
+  //   app.quit();
+  // }
 });
 
 app
   .whenReady()
   .then(() => {
     createWindow();
+
+    // Register Tray Icon
+    tray = new Tray(path.join(RESOURCES_PATH, 'icon.png'));
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Show AV Assistant',
+        type: 'normal',
+        click: () => mainWindow?.show(),
+      },
+    ]);
+    let tooltip = 'FIM AV Assistant\n';
+    tooltip += `Version: ${app.getVersion()}\n`;
+    tooltip += 'FMS IP: 10.0.100.5\n';
+    tooltip += 'AV Internet IP: Unknown\n';
+    tooltip += 'AV Field IP: Unknown';
+    tray.setToolTip(tooltip);
+    tray.setContextMenu(contextMenu);
+
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
