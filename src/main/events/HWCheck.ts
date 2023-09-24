@@ -27,7 +27,7 @@ export default function HWCheck(): HWCheckResponse {
     return {
         ip_ready: true,
         audio_ready: true,
-        network_ready: interfaceNames.length > 0,
-        not_official_hw: !isAVCart
+        network_ready: Object.keys(interfaces).length > 0,
+        unofficial_hw: !isAVCart,
     };
 }
