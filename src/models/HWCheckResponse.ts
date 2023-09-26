@@ -10,6 +10,12 @@ export default interface HWCheckResponse {
     logs: string[],
     nics_found: string[],
     audio_devices_found: AudioDeviceStatus[],
+    device_statuses: {
+        mixer: boolean,
+        switch: boolean,
+        ptz1: boolean,
+        ptz2: boolean,
+    }
 }
 
 export interface AudioDeviceStatus {

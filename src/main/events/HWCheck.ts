@@ -2,13 +2,16 @@ import { spawn } from "child_process";
 import HWCheckResponse from "models/HWCheckResponse";
 import SoundVolumeViewOutput from "models/SoundVolumeViewOutput";
 import { networkInterfaces, hostname, NetworkInterfaceInfo } from "os";
-import parseJson from "parse-json";
 import path from "path";
-import SysInfo from "systeminformation";
+import ping from "ping";
 
 const SoundVolumeViewPath = process.env.NODE_ENV === 'production'
     ? path.join(process.resourcesPath, 'assets/SoundVolumeView/SoundVolumeView.exe')
     : path.join(__dirname, '../../../assets/SoundVolumeView/SoundVolumeView.exe');
+
+const pingConfig = {
+    timeout: 3,
+}
 
 export default async function HWCheck(): Promise<HWCheckResponse> {
     // The response
@@ -24,6 +27,12 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
         logs: [],
         nics_found: [],
         audio_devices_found: [],
+        device_statuses: {
+            mixer: false,
+            switch: false,
+            ptz1: false,
+            ptz2: false,
+        }
     }
 
     // Get Computer Name
@@ -78,12 +87,40 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     // Check that AV Vlan has a static IP of 192.168.25.<cart_number>0
     const avIp = vlan30?.find((i) => i.family === "IPv4")?.address;
     resp.av_ip_ready = avIp === `192.168.25.${cartNumber}0`;
-    if (!resp.av_ip_ready) resp.errors.push(`AV VLAN IP is incorrectly set to ${avIp}. Should be set statically to 192.168.25.${cartNumber}0, subnet mask of 255.255.255.0, and with no gateway`);
+    if (!resp.av_ip_ready) {
+        resp.errors.push(`AV VLAN IP is incorrectly set to ${avIp}. Should be set statically to 192.168.25.${cartNumber}0, subnet mask of 255.255.255.0, and with no gateway`);
+    } else {
+        // Ping on-cart devices
+        const promises = [
+            // TODO: Ensure these are the right IPs
+            // Ping switch
+            ping.promise.probe(`192.168.25.10${cartNumber}`, pingConfig),
+            // Ping mixer
+            ping.promise.probe(`192.168.25.${cartNumber}2`, pingConfig),
+            // Ping PTZ1
+            ping.promise.probe(`192.168.25.${cartNumber}3`, pingConfig),
+            // Ping PTZ2
+            ping.promise.probe(`192.168.25.${cartNumber}4`, pingConfig),
+        ]
+
+        // Wait for all pings to finish
+        await Promise.all(promises).then(rsp => {
+            resp.device_statuses = {
+                mixer: rsp[1].alive,
+                switch: rsp[0].alive,
+                ptz1: rsp[2].alive,
+                ptz2: rsp[3].alive,
+            }
+        }).catch(err => {
+            resp.errors.push("Failed to ping on-cart devices. No worries, we'll set these up later.");
+            console.log("Could not ping on-cart devices: ", err);
+        });
+    }
 
     // Check that Venue Vlan has an IP that doesn't start with 169.254
     const venueIp = vlan10?.find((i) => i.family === "IPv4")?.address;
     resp.venue_ip_ready = venueIp !== undefined && !venueIp.startsWith("169.254");
-    if (!resp.venue_ip_ready) resp.errors.push(`No IP from venue! Internet will probably not work (IP: ${venueIp})`);
+    // if (!resp.venue_ip_ready) resp.errors.push(`No IP from venue! Internet will probably not work (IP: ${venueIp})`);
 
     // Determine which interface the Field Network is plugged into
     const fieldIpVlan = vlan20?.find((i) => i.family === "IPv4")?.address;
@@ -97,7 +134,7 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     } else {
         resp.field_ip_ready = false;
         resp.field_nic_used = "Unknown";
-        resp.errors.push("Could not find Field Network IP.  Please ensure the field network is plugged into either port 7 on the switch or the secondary NIC of the motherboard.");
+        // resp.errors.push("Could not find Field Network IP.  Please ensure the field network is plugged into either port 7 on the switch or the secondary NIC of the motherboard.");
     }
 
     // Check audio devices

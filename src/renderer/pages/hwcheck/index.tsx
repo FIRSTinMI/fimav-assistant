@@ -54,7 +54,11 @@ const HWCheck = ({ nextStep, previousStep }: Steppable) => {
                 <Typography.Text><ReadyHandeler ready={audioReady} /> Audio Devices</Typography.Text>
 
                 {errors && errors.length > 0 && 
-                    errors.map(error => <Typography.Text type="danger">{error}</Typography.Text>)
+                    <>
+                    
+                        <Typography.Text>Don't worry about any errors below. We'll help you get these resolved soon!</Typography.Text>
+                        {errors.map(error => <Typography.Text type="danger">{error}</Typography.Text>)}
+                    </>
                 }
 
                 {/* Meanwhile, locate your AV Totes */}
