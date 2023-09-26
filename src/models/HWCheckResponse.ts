@@ -7,6 +7,20 @@ export default interface HWCheckResponse {
     field_nic_used: "Unknown" | "VLAN" | "Secondary"
     cart_number: number,
     errors: string[],
+    logs: string[],
     nics_found: string[],
-    audio_devices_found: {name: string, id: string|number, type: string, volume_percent: string}[],
+    audio_devices_found: AudioDeviceStatus[],
+}
+
+export interface AudioDeviceStatus {
+    name: string;
+    sub_name: string;
+    id: string | number;
+    type: string;
+    device_type: "Capture" | "Render" | "";
+    volume_percent: string;
+    default: "Render" | "Capture" | "";
+    muted: boolean;
+    control_id: string;
+    registry_key: string;
 }

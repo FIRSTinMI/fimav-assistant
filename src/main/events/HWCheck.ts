@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import HWCheckResponse from "models/HWCheckResponse";
 import SoundVolumeViewOutput from "models/SoundVolumeViewOutput";
 import { networkInterfaces, hostname, NetworkInterfaceInfo } from "os";
+import parseJson from "parse-json";
 import path from "path";
 import SysInfo from "systeminformation";
 
@@ -9,7 +10,7 @@ const SoundVolumeViewPath = process.env.NODE_ENV === 'production'
     ? path.join(process.resourcesPath, 'assets/SoundVolumeView/SoundVolumeView.exe')
     : path.join(__dirname, '../../../assets/SoundVolumeView/SoundVolumeView.exe');
 
-export default function HWCheck(): HWCheckResponse {
+export default async function HWCheck(): Promise<HWCheckResponse> {
     // The response
     const resp: HWCheckResponse = {
         audio_ready: false,
@@ -20,6 +21,7 @@ export default function HWCheck(): HWCheckResponse {
         field_nic_used: "Unknown", // or "VLAN" or "Secondary"
         cart_number: -1,
         errors: [],
+        logs: [],
         nics_found: [],
         audio_devices_found: [],
     }
@@ -99,20 +101,56 @@ export default function HWCheck(): HWCheckResponse {
     }
 
     // Check audio devices
-    getAudioDevices().then((audio) => {
-        console.log(audio);
-
-        resp.audio_devices_found = audio.map((a) => ({
-            name: a.Name,
-            id: a["Item ID"],
-            type: a.Type,
-            volume_percent: a["Channels Percent"],
-        }));
-
-    }).catch((err) => {
-        resp.errors.push(`Could not get audio devices: ${err}`);
+    resp.audio_devices_found = await fetchAndParseAudioDevices().catch((err) => {
+        resp.errors.push("Could not fetch audio devices.  Please contact FIMAV Support.");
+        console.log("Could not fetch audio devices: ", err);
+        return [] as any;
     });
 
+    // Ensure that "IN 1-2" of "BEHRINGER X-AIR" is the default, is unmuted, and the volume is over 75%
+    const xAirIndex = resp.audio_devices_found.findIndex((a) => a.name === "IN 1-2" && a.sub_name.includes("BEHRINGER X-AIR"));
+    const xAir = resp.audio_devices_found[xAirIndex];
+
+    if (!xAir) {
+        resp.errors.push("Could not find BEHRINGER X-AIR 'IN 1-2' audio device.  Contact FIMAV Support for assistance.");
+    } else {
+        // Mark audio as ready.  If we later find an error that we can't fix, we will set this to false
+        resp.audio_ready = true;
+
+        if (xAir.default !== "Render") {
+            // Not default device
+            await setDefaultAudioDevice(xAir.name, "all").then(() => {
+                resp.logs.push(`Set BEHRINGER X-AIR 'IN 1-2' as default audio device.`);
+                resp.audio_devices_found[xAirIndex].default = "Render";
+            }).catch((err) => {
+                resp.errors.push(`Could not set BEHRINGER X-AIR 'IN 1-2' as default audio device.  Please select it from the task bar.`);
+                console.log("Could not set default device: ", err);
+                resp.audio_ready = false;
+            });
+        }
+        if (xAir.muted) {
+            // Muted
+            await unmuteDevice(xAir.name).then(() => {
+                resp.logs.push(`Unmuted BEHRINGER X-AIR 'IN 1-2'`);
+                resp.audio_devices_found[xAirIndex].muted = false;
+            }).catch((err) => {
+                resp.errors.push(`Could not unmute BEHRINGER X-AIR 'IN 1-2'.  Please unmute it from the task bar.`);
+                console.log("Could not unmute device: ", err);
+                resp.audio_ready = false;
+            });
+        }
+        if (parseInt(xAir.volume_percent.replace("%", ""), 10) < 75) {
+            // Percetage is less than 75%
+            await setVolumePercent(xAir.name, 75).then(() => {
+                resp.logs.push(`Set BEHRINGER X-AIR 'IN 1-2' volume to 75%`);
+                resp.audio_devices_found[xAirIndex].volume_percent = "75.0%";
+            }).catch((err) => {
+                resp.errors.push(`Could not set BEHRINGER X-AIR 'IN 1-2' volume to 75%.  Please set it from the task bar.`);
+                console.log("Could not set volume: ", err);
+                resp.audio_ready = false;
+            });
+        };
+    }
 
     resp.cart_number = cartNumber;
 
@@ -120,6 +158,29 @@ export default function HWCheck(): HWCheckResponse {
 
     return resp;
 }
+
+async function fetchAndParseAudioDevices(): Promise<SoundVolumeViewOutput[]> {
+    // Fetch Devices
+    const devices = await getAudioDevices();
+
+    // Parse them to pretty 
+    const parsed = devices.map((a) => ({
+        name: a.Name,
+        sub_name: a["Device Name"],
+        id: a["Item ID"],
+        type: a.Type,
+        device_type: a.Direction,
+        volume_percent: a["Volume Percent"],
+        default: a.Default,
+        muted: a.Muted === "Yes",
+        control_id: a["Command-Line Friendly ID"].replaceAll("\\\\", "\\"),
+        registry_key: a["Registry Key"].replaceAll("\\\\", "\\")
+    }));
+
+    // Return
+    return parsed as any[]
+}
+
 
 async function getAudioDevices(): Promise<SoundVolumeViewOutput[]> {
     return new Promise((resolve, reject) => {
@@ -131,22 +192,69 @@ async function getAudioDevices(): Promise<SoundVolumeViewOutput[]> {
         });
 
         proc.on("exit", () => {
-            // Trim buffer untill the first [ character
-            while (buffer[0] !== 91) {
-                buffer = buffer.slice(1);
-            }
+            // Buffer to string
+            let str = buffer.toString();
 
-            // Trim end of buffer untill the last ] character
-            while (buffer[buffer.length - 1] !== 93) {
-                buffer = buffer.slice(0, buffer.length - 1);
-            }
-            
-            try{
-                resolve(JSON.parse(buffer.toString()));
+            // Trim str until the first [ character
+            const firstBracket = str.indexOf("[");
+            str = str.slice(firstBracket);
+
+            // Trim end until the last ] character
+            const lastBracket = str.lastIndexOf("]");
+            str = str.slice(0, lastBracket + 1);
+
+            try {
+                // Replace some (ok, a lot...) things
+                const replaced = str
+                    .replaceAll("\n", "")
+                    .replaceAll("\0", "") // this is dumb and took way too long to figure out. JSON won't parse if there are null characters in the string
+                    .replaceAll("\r", "")
+                    .replaceAll("\t", "")
+                    .replace(/^\s+|\s+$/g, "")
+                    .replace(/\\n/g, "\\n")
+                    .replace(/\\'/g, "\\'")
+                    .replace(/\\"/g, '\\"')
+                    .replace(/\\&/g, "\\&")
+                    .replace(/\\r/g, "\\r")
+                    .replace(/\\t/g, "\\t")
+                    .replace(/\\b/g, "\\b")
+                    .replace(/\\f/g, "\\f")
+                    .replaceAll("\\", "\\\\"); // This MUST be last!
+                resolve(JSON.parse(replaced));
             } catch (err) {
-                console.log("Error Parsing JSON: ", err, '\n\n\n', buffer.toString());
+                console.log("Error Parsing JSON: ", err);
                 resolve([]);
             }
+        });
+    });
+}
+
+// Percent is 0-100
+async function setVolumePercent(deviceCmdName: string, percent: number): Promise<boolean> {
+    return runSetSoundCommand("/SetVolume", deviceCmdName, percent.toString());
+}
+
+async function unmuteDevice(deviceCmdName: string): Promise<boolean> {
+    return runSetSoundCommand("/Unmute", deviceCmdName);
+}
+
+async function setDefaultAudioDevice(deviceCmdName: string, type: "Console" | "Multimedia" | "Communications" | "all"): Promise<boolean> {
+    return runSetSoundCommand("/SetDefault", deviceCmdName, type);
+}
+
+async function runSetSoundCommand(cmd: string, ...params: string[]): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+        // Spawn the process
+        const proc = spawn(SoundVolumeViewPath, [cmd, ...params]);
+
+        // Listen for exit
+        proc.on("exit", () => {
+            resolve(true);
+        });
+
+        // Listen for error
+        proc.on("error", (err) => {
+            reject(err);
         });
     });
 }
