@@ -84,12 +84,36 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     // Check that we found all the required NICs
     if (foundCount < 5) resp.errors.push("Could not find all required network interfaces. Please contact FIMAV Support");
 
+    // Enable DHCP on field and venue NICs
+    if (vlan10) await enableDhcp("Ethernet").then(() => {
+        resp.logs.push("Enabled DHCP on Venue VLAN");
+    }).catch((err) => {
+        console.log("Could not enable DHCP on Venue VLAN: ", err);
+        resp.errors.push("Failed to enable DHCP on Venue VLAN");
+    });
+
+    if (vlan20) await enableDhcp("Ethernet 2").then(() => {
+        resp.logs.push("Enabled DHCP on Field VLAN");
+    }).catch((err) => {
+        console.log("Could not enable DHCP on Field VLAN: ", err);
+        resp.errors.push("Failed to enable DHCP on Field VLAN");
+    });
+
     // Check that AV Vlan has a static IP of 192.168.25.<cart_number>0
     const avIp = vlan30?.find((i) => i.family === "IPv4")?.address;
     resp.av_ip_ready = avIp === `192.168.25.${cartNumber}0`;
     if (!resp.av_ip_ready) {
-        resp.errors.push(`AV VLAN IP is incorrectly set to ${avIp}. Should be set statically to 192.168.25.${cartNumber}0, subnet mask of 255.255.255.0, and with no gateway`);
-    } else {
+        // Call netsh to set the IP
+        await setStaticIp("Ethernet", `192.168.25.${cartNumber}0`, "255.255.255.0", "").then(() => {
+            resp.logs.push(`Set AV VLAN IP was incorrectly set to ${avIp}.  Set static to 192.168.25.${cartNumber}0`);
+            resp.av_ip_ready = true;
+        }).catch((err) => {
+            console.log("Could not set AV VLAN IP: ", err);
+            resp.errors.push(`AV VLAN IP is incorrectly set to ${avIp}, and was unable to be updated. Should be set statically to 192.168.25.${cartNumber}0, subnet mask of 255.255.255.0, and with no gateway`);
+        });
+    }
+
+    if (resp.av_ip_ready) {
         // Ping on-cart devices
         const promises = [
             // TODO: Ensure these are the right IPs
@@ -196,6 +220,40 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     return resp;
 }
 
+async function enableDhcp(interfaceName: string): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+        // Run netsh interface ipv4 set address name="Ethernet" static
+        const proc = spawn("netsh", ["interface", "ipv4", "set", "address", `name="${interfaceName}"`, "dhcp"]);
+
+        // Listen for exit
+        proc.on("exit", () => {
+            resolve(true);
+        });
+
+        // Listen for error
+        proc.on("error", (err) => {
+            reject(err);
+        });
+    });
+}
+
+async function setStaticIp(interfaceName: string, ip: string, subnet: string, gateway: string): Promise<boolean> {
+    return new Promise((resolve, reject) => {
+        // Run netsh interface ipv4 set address name="Ethernet" static
+        const proc = spawn("netsh", ["interface", "ipv4", "set", "address", `name="${interfaceName}"`, "static", ip, subnet, gateway]);
+
+        // Listen for exit
+        proc.on("exit", () => {
+            resolve(true);
+        });
+
+        // Listen for error
+        proc.on("error", (err) => {
+            reject(err);
+        });
+    });
+}
+
 async function fetchAndParseAudioDevices(): Promise<SoundVolumeViewOutput[]> {
     // Fetch Devices
     const devices = await getAudioDevices();
@@ -217,7 +275,6 @@ async function fetchAndParseAudioDevices(): Promise<SoundVolumeViewOutput[]> {
     // Return
     return parsed as any[]
 }
-
 
 async function getAudioDevices(): Promise<SoundVolumeViewOutput[]> {
     return new Promise((resolve, reject) => {
