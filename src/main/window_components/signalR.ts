@@ -18,10 +18,6 @@ export default function setupSignalR(store: Store<AppConfig>, createAlertsWindow
     .withAutomaticReconnect({
       nextRetryDelayInMilliseconds(retryContext) {
         log.warn('Retrying SignalR connection...')
-        if (retryContext.previousRetryCount > 10) {
-          return null;
-        }
-
         return Math.min(2_000 * retryContext.previousRetryCount, 60_000);
       },
     })
