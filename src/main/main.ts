@@ -1,14 +1,15 @@
 /* eslint global-require: off, no-console: off, promise/always-return: off */
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain, globalShortcut, screen } from 'electron';
+import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu';
-import { resolveHtmlPath } from './util';
+import { RESOURCES_PATH, getAssetPath, resolveHtmlPath } from './util';
 import { registerAllEvents } from './register-events';
 import { createStore } from './store';
 import setupSignalR from './window_components/signalR';
 import buildTray from './window_components/tray';
+import createAlertsWindow from './window_components/alertsWindow';
 
 class AppUpdater {
   constructor() {
@@ -19,7 +20,6 @@ class AppUpdater {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let alertsWindow: BrowserWindow | null = null;
 let appIsQuitting = false;
 
 // Register all the event handlers
@@ -48,14 +48,6 @@ const installExtensions = async () => {
       forceDownload
     )
     .catch(console.log);
-};
-
-const RESOURCES_PATH = app.isPackaged
-  ? path.join(process.resourcesPath, 'assets')
-  : path.join(__dirname, '../../assets');
-
-const getAssetPath = (...paths: string[]): string => {
-  return path.join(RESOURCES_PATH, ...paths);
 };
 
 /** Create the main window */
@@ -116,47 +108,6 @@ const createWindow = async () => {
   new AppUpdater();
 };
 
-/** Create the window which shows pending alerts. Note: this window is a singleton */
-const createAlertsWindow = async () => {
-  if (alertsWindow != null) return;
-  const display = screen.getPrimaryDisplay();
-  const width = display.bounds.width;
-  const windowWidth = Math.round(width * 0.25);
-  alertsWindow = new BrowserWindow({
-    show: false,
-    width: windowWidth,
-    height: 400,
-    // Top right of primary screen
-    x: width - windowWidth,
-    y: 0,
-    minimizable: false,
-    closable: true,
-    maximizable: false,
-    fullscreenable: false,
-    alwaysOnTop: true,
-    title: 'Alerts',
-    icon: getAssetPath('icon.png'),
-    webPreferences: {
-      preload: app.isPackaged
-        ? path.join(__dirname, 'preload.js')
-        : path.join(__dirname, '../../.erb/dll/preload.js'),
-    },
-  });
-
-  alertsWindow.loadURL(resolveHtmlPath('index.html', '/alerts/'));
-
-  alertsWindow.on('ready-to-show', () => {
-    if (!alertsWindow) {
-      throw new Error('"alertsWindow" is not defined');
-    }
-    alertsWindow.show();
-  });
-
-  alertsWindow.on('closed', () => {
-    alertsWindow = null;
-  });
-};
-
 /**
  * Add event listeners...
  */
@@ -194,5 +145,3 @@ app
     });
   })
   .catch(console.log);
-
-export { alertsWindow };
