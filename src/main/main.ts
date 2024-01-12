@@ -17,12 +17,15 @@ import {
   Tray,
   Menu,
   globalShortcut,
+  screen
 } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu';
 import { resolveHtmlPath } from './util';
 import { registerAllEvents } from './register-events';
+import { createStore } from './store';
+import setupSignalR from './window_components/signalR';
 
 class AppUpdater {
   constructor() {
@@ -33,14 +36,9 @@ class AppUpdater {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let alertsWindow: BrowserWindow | null = null;
 let tray = null;
 let appIsQuitting = false;
-
-ipcMain.on('ipc-example', async (event, arg) => {
-  const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
-  console.log(msgTemplate(arg));
-  event.reply('ipc-example', msgTemplate('pong'));
-});
 
 // Register all the event handlers
 registerAllEvents(ipcMain);
@@ -54,13 +52,13 @@ const isDebug =
   process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 if (isDebug) {
-  require('electron-debug')();
+  require('electron-debug')({ showDevTools: false });
 }
 
 const installExtensions = async () => {
   const installer = require('electron-devtools-installer');
   const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
-  const extensions = ['REACT_DEVELOPER_TOOLS'];
+  const extensions: string[] = [];
 
   return installer
     .default(
@@ -78,6 +76,7 @@ const getAssetPath = (...paths: string[]): string => {
   return path.join(RESOURCES_PATH, ...paths);
 };
 
+/** Create the main window */
 const createWindow = async () => {
   if (isDebug) {
     await installExtensions();
@@ -135,18 +134,59 @@ const createWindow = async () => {
   new AppUpdater();
 };
 
+/** Create the window which shows pending alerts. Note: this window is a singleton */
+const createAlertsWindow = async () => {
+  if (alertsWindow != null) return;
+  const display = screen.getPrimaryDisplay();
+  const width = display.bounds.width;
+  const windowWidth = Math.round(width * 0.25);
+  alertsWindow = new BrowserWindow({
+    show: false,
+    width: windowWidth,
+    height: 400,
+    // Top right of primary screen
+    x: width - windowWidth,
+    y: 0,
+    minimizable: false,
+    closable: true,
+    maximizable: false,
+    fullscreenable: false,
+    alwaysOnTop: true,
+    title: 'Alerts',
+    icon: getAssetPath('icon.png'),
+    webPreferences: {
+      preload: app.isPackaged
+        ? path.join(__dirname, 'preload.js')
+        : path.join(__dirname, '../../.erb/dll/preload.js'),
+    },
+  });
+
+  alertsWindow.loadURL(resolveHtmlPath('index.html', '/alerts/'));
+
+  alertsWindow.on('ready-to-show', () => {
+    if (!alertsWindow) {
+      throw new Error('"alertsWindow" is not defined');
+    }
+    alertsWindow.show();
+  });
+
+  alertsWindow.on('closed', () => {
+    alertsWindow = null;
+  });
+};
+
 /**
  * Add event listeners...
  */
-
 app.on('window-all-closed', () => {
-  app.quit();
+  // app.quit();
 });
 
 app
   .whenReady()
   .then(() => {
     createWindow();
+    const store = createStore();
 
     // Register Shortcuts
     if (!app.isPackaged) {
@@ -169,10 +209,15 @@ app
     let tooltip = 'FIM AV Assistant\n';
     tooltip += `Version: ${app.getVersion()}\n`;
     tooltip += 'FMS IP: 10.0.100.5\n';
-    tooltip += 'AV Internet IP: Unknown\n';
-    tooltip += 'AV Field IP: Unknown';
+    // tooltip += 'AV Internet IP: Unknown\n';
+    // tooltip += 'AV Field IP: Unknown';
     tray.setToolTip(tooltip);
     tray.setContextMenu(contextMenu);
+
+    // TODO: Currently the API key is set manually by opening the config.json file
+    if (store.get('apiKey')) {
+      setupSignalR(store, createAlertsWindow);
+    }
 
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
@@ -181,3 +226,5 @@ app
     });
   })
   .catch(console.log);
+
+export { alertsWindow };
