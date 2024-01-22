@@ -1,7 +1,5 @@
 /* eslint global-require: off, no-console: off, promise/always-return: off */
 import path from 'path';
-import { autoUpdater } from 'electron-updater';
-const { Worker } = require('node:worker_threads');
 import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
@@ -24,7 +22,6 @@ class AppUpdater {
 let mainWindow: BrowserWindow | null = null;
 let appIsQuitting = false;
 
-
 // Register all the event handlers
 registerAllEvents(ipcMain);
 
@@ -37,13 +34,13 @@ const isDebug =
     process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 if (isDebug) {
-    require('electron-debug')();
+    require('electron-debug')({ showDevTools: false });
 }
 
 const installExtensions = async () => {
     const installer = require('electron-devtools-installer');
     const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
-    const extensions = ['REACT_DEVELOPER_TOOLS'];
+    const extensions: string[] = [];
 
     return installer
         .default(
@@ -51,35 +48,6 @@ const installExtensions = async () => {
             forceDownload
         )
         .catch(console.log);
-};
-
-const RESOURCES_PATH = app.isPackaged
-    ? path.join(process.resourcesPath, 'assets')
-    : path.join(__dirname, '../../assets');
-
-const BACKGROUND_THREAD_PATH = app.isPackaged
-    ? path.join(process.resourcesPath, 'src/main/backgroundThread.js')
-    : path.join(__dirname, '../../.erb/dll/autoav/background_threads/autoav.js');
-
-const getResourcePath = (...paths: string[]): string => {
-    return path.join(RESOURCES_PATH, ...paths);
-};
-
-=======
-  require('electron-debug')({ showDevTools: false });
-}
-
-const installExtensions = async () => {
-  const installer = require('electron-devtools-installer');
-  const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
-  const extensions: string[] = [];
-
-  return installer
-    .default(
-      extensions.map((name) => installer[name]),
-      forceDownload
-    )
-    .catch(console.log);
 };
 
 /** Create the main window */
@@ -92,49 +60,8 @@ const createWindow = async () => {
         show: false,
         width: 1024,
         height: 728,
-        icon: getResourcePath('icon.png'),
-        webPreferences: {
-            preload: app.isPackaged
-                ? path.join(__dirname, 'preload.js')
-                : path.join(__dirname, '../../.erb/dll/preload.js'),
-        },
-    });
-
-    mainWindow.loadURL(resolveHtmlPath('index.html'));
-
-    mainWindow.on('ready-to-show', () => {
-        if (!mainWindow) {
-            throw new Error('"mainWindow" is not defined');
-        }
-    });
-
-    mainWindow.on('minimize', (event: any) => {
-        event.preventDefault();
-        mainWindow?.hide();
-    });
-
-    mainWindow.on('close', (event) => {
-        if (!appIsQuitting) {
-            event.preventDefault();
-            mainWindow?.hide();
-            return false;
-        }
-        mainWindow?.destroy();
-
-        return true;
-    });
-
-    const getAssetPath = (...paths: string[]): string => {
-        return path.join(RESOURCES_PATH, ...paths);
-    };
-
-    mainWindow = new BrowserWindow({
-        show: false,
-        width: 1024,
-        height: 728,
         icon: getAssetPath('icon.png'),
         webPreferences: {
-            nodeIntegrationInWorker: true,
             preload: app.isPackaged
                 ? path.join(__dirname, 'preload.js')
                 : path.join(__dirname, '../../.erb/dll/preload.js'),
@@ -151,8 +78,20 @@ const createWindow = async () => {
         mainWindow.focus();
     });
 
-    mainWindow.on('closed', () => {
-        mainWindow = null;
+    mainWindow.on('minimize', (event: any) => {
+        event.preventDefault();
+        mainWindow?.hide();
+    });
+
+    mainWindow.on('close', (event) => {
+        if (!appIsQuitting) {
+            event.preventDefault();
+            mainWindow?.hide();
+            return false;
+        }
+        mainWindow?.destroy();
+
+        return true;
     });
 
     const menuBuilder = new MenuBuilder(mainWindow);
@@ -173,36 +112,36 @@ const createWindow = async () => {
  * Add event listeners...
  */
 app.on('window-all-closed', () => {
-  // app.quit();
+    // app.quit();
 });
 
 app
-  .whenReady()
-  .then(() => {
-    createWindow();
-    const store = createStore();
+    .whenReady()
+    .then(() => {
+        createWindow();
+        const store = createStore();
 
-    // Register Shortcuts
-    if (!app.isPackaged) {
-      // Ctrl + Q to quit
-      globalShortcut.register('CommandOrControl+Q', () => {
-        appIsQuitting = true;
-        app.quit();
-      });
-    }
+        // Register Shortcuts
+        if (!app.isPackaged) {
+            // Ctrl + Q to quit
+            globalShortcut.register('CommandOrControl+Q', () => {
+                appIsQuitting = true;
+                app.quit();
+            });
+        }
 
-    // Register Tray Icon
-    buildTray(mainWindow, RESOURCES_PATH, app.getVersion());
+        // Register Tray Icon
+        buildTray(mainWindow, RESOURCES_PATH, app.getVersion());
 
-    // TODO: Currently the API key is set manually by opening the config.json file
-    if (store.get('apiKey')) {
-      setupSignalR(store, createAlertsWindow);
-    }
+        // TODO: Currently the API key is set manually by opening the config.json file
+        if (store.get('apiKey')) {
+            setupSignalR(store, createAlertsWindow);
+        }
 
-    app.on('activate', () => {
-      // On macOS it's common to re-create a window in the app when the
-      // dock icon is clicked and there are no other windows open.
-      if (mainWindow === null) createWindow();
-    });
-  })
-  .catch(console.log);
+        app.on('activate', () => {
+            // On macOS it's common to re-create a window in the app when the
+            // dock icon is clicked and there are no other windows open.
+            if (mainWindow === null) createWindow();
+        });
+    })
+    .catch(console.log);

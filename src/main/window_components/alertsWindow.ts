@@ -1,5 +1,5 @@
 import { BrowserWindow, app, screen } from "electron";
-import { getAssetPath, resolveHtmlPath } from "main/util";
+import { getAssetPath, resolveHtmlPath } from "../../main/util";
 import path from "path";
 
 let alertsWindow: BrowserWindow | null = null;

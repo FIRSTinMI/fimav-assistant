@@ -50,10 +50,10 @@ const HWCheck = ({ nextStep, previousStep }: Steppable) => {
 
                 <Row>
                     <Col span={12}>
-                        <img src={AVTotes} style={{ width: "80%" }} />
+                        <img src={AVTotes} alt="2 Gray AV Totes" style={{ width: "80%" }} />
                     </Col>
                     <Col span={12}>
-                        <img src={CameraPelicans} style={{ width: "80%" }} />
+                        <img src={CameraPelicans} alt="AV Pelicans" style={{ width: "80%" }} />
                     </Col>
                 </Row>
             </Space>

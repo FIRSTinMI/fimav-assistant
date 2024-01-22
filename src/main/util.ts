@@ -24,3 +24,11 @@ export const RESOURCES_PATH = app.isPackaged
 export function getAssetPath(...paths: string[]): string {
   return path.join(RESOURCES_PATH, ...paths);
 }
+
+export const BACKGROUND_THREAD_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'src/main/backgroundThread.js')
+  : path.join(__dirname, '../../.erb/dll/autoav/background_threads/autoav.js');
+
+export const getResourcePath = (...paths: string[]): string => {
+  return path.join(RESOURCES_PATH, ...paths);
+};
