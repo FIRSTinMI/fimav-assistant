@@ -1,30 +1,17 @@
 /* eslint global-require: off, no-console: off, promise/always-return: off */
-
-/**
- * This module executes inside of electron's main process. You can start
- * electron renderer process from here and communicate with the other processes
- * through IPC.
- *
- * When running `npm run build` or `npm run build:main`, this file is compiled to
- * `./src/main.js` using webpack. This gives us some performance wins.
- */
 import path from 'path';
-import {
-    app,
-    BrowserWindow,
-    shell,
-    ipcMain,
-    Tray,
-    Menu,
-    globalShortcut,
-} from 'electron';
+import { autoUpdater } from 'electron-updater';
+const { Worker } = require('node:worker_threads');
+import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu';
-import { resolveHtmlPath } from './util';
-import registerAllEvents from './register-events';
-
-const { Worker } = require('node:worker_threads');
+import { RESOURCES_PATH, getAssetPath, resolveHtmlPath } from './util';
+import { registerAllEvents } from './register-events';
+import { createStore } from './store';
+import setupSignalR from './window_components/signalR';
+import buildTray from './window_components/tray';
+import createAlertsWindow from './window_components/alertsWindow';
 
 class AppUpdater {
     constructor() {
@@ -35,14 +22,8 @@ class AppUpdater {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let tray = null;
 let appIsQuitting = false;
 
-ipcMain.on('ipc-example', async (event, arg) => {
-    const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
-    console.log(msgTemplate(arg));
-    event.reply('ipc-example', msgTemplate('pong'));
-});
 
 // Register all the event handlers
 registerAllEvents(ipcMain);
@@ -84,6 +65,24 @@ const getResourcePath = (...paths: string[]): string => {
     return path.join(RESOURCES_PATH, ...paths);
 };
 
+=======
+  require('electron-debug')({ showDevTools: false });
+}
+
+const installExtensions = async () => {
+  const installer = require('electron-devtools-installer');
+  const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
+  const extensions: string[] = [];
+
+  return installer
+    .default(
+      extensions.map((name) => installer[name]),
+      forceDownload
+    )
+    .catch(console.log);
+};
+
+/** Create the main window */
 const createWindow = async () => {
     if (isDebug) {
         await installExtensions();
@@ -173,56 +172,37 @@ const createWindow = async () => {
 /**
  * Add event listeners...
  */
-
 app.on('window-all-closed', () => {
-    app.quit();
+  // app.quit();
 });
 
 app
-    .whenReady()
-    .then(() => {
-        createWindow();
+  .whenReady()
+  .then(() => {
+    createWindow();
+    const store = createStore();
 
-        // Register Shortcuts
-        if (!app.isPackaged) {
-            // Ctrl + Q to quit
-            globalShortcut.register('CommandOrControl+Q', () => {
-                appIsQuitting = true;
-                app.quit();
-            });
-        }
+    // Register Shortcuts
+    if (!app.isPackaged) {
+      // Ctrl + Q to quit
+      globalShortcut.register('CommandOrControl+Q', () => {
+        appIsQuitting = true;
+        app.quit();
+      });
+    }
 
-        // Register Tray Icon
-        tray = new Tray(path.join(RESOURCES_PATH, 'icon.png'));
-        const contextMenu = Menu.buildFromTemplate([
-            {
-                label: 'Show AV Assistant',
-                type: 'normal',
-                click: () => mainWindow?.show(),
-            },
-        ]);
-        let tooltip = 'FIM AV Assistant\n';
-        tooltip += `Version: ${app.getVersion()}\n`;
-        tooltip += 'FMS IP: 10.0.100.5\n';
-        tooltip += 'AV Internet IP: Unknown\n';
-        tooltip += 'AV Field IP: Unknown';
-        tray.setToolTip(tooltip);
-        tray.setContextMenu(contextMenu);
+    // Register Tray Icon
+    buildTray(mainWindow, RESOURCES_PATH, app.getVersion());
 
-        const worker = new Worker(BACKGROUND_THREAD_PATH);
+    // TODO: Currently the API key is set manually by opening the config.json file
+    if (store.get('apiKey')) {
+      setupSignalR(store, createAlertsWindow);
+    }
 
-        worker.on('message', (msg: string) => {
-            console.log('From worker:', msg);
-        });
-
-        worker.on('error', (msg: string) => {
-            console.error('From worker:', msg);
-        });
-
-        app.on('activate', () => {
-            // On macOS it's common to re-create a window in the app when the
-            // dock icon is clicked and there are no other windows open.
-            if (mainWindow === null) createWindow();
-        });
-    })
-    .catch(console.log);
+    app.on('activate', () => {
+      // On macOS it's common to re-create a window in the app when the
+      // dock icon is clicked and there are no other windows open.
+      if (mainWindow === null) createWindow();
+    });
+  })
+  .catch(console.log);

@@ -341,6 +341,7 @@ async function runSetSoundCommand(cmd: string, ...params: string[]): Promise<boo
         // Spawn the process
         const proc = spawn(SoundVolumeViewPath, [cmd, ...params]);
 
+/* TODO: investigate further
         // Listen for exit
         proc.on("exit", () => {
             resolve(true);
@@ -351,4 +352,11 @@ async function runSetSoundCommand(cmd: string, ...params: string[]): Promise<boo
             reject(err);
         });
     });
+*/
+    return {
+        ip_ready: true,
+        audio_ready: true,
+        network_ready: (Object.keys(interfaces)?.length ?? 0) > 0,
+        unofficial_hw: !isAVCart
+    };
 }
