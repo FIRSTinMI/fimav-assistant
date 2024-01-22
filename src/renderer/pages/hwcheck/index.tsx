@@ -6,12 +6,7 @@ import { useEffect, useState } from "react";
 import StepBar from "renderer/components/StepBar";
 import AVTotes from "../../../../assets/photos/av_totes.png"
 import CameraPelicans from "../../../../assets/photos/camera_pelicans.jpg"
-
-enum ReadyState {
-    NotReady,
-    Ready,
-    Error
-}
+import ReadyHandeler, { ReadyState } from "renderer/components/ReadyHandeler";
 
 const HWCheck = ({ nextStep, previousStep }: Steppable) => {
 
@@ -19,6 +14,7 @@ const HWCheck = ({ nextStep, previousStep }: Steppable) => {
     const [ipReady, setIpReady] = useState(ReadyState.NotReady);
     const [audioReady, setAudioReady] = useState(ReadyState.NotReady);
     const [errors, setErrors] = useState<string[]>([]);
+    const [ready, setReady] = useState<boolean>(false);
 
     useEffect(() => {
         // Fire off HW check and register listener
@@ -27,22 +23,10 @@ const HWCheck = ({ nextStep, previousStep }: Steppable) => {
             setIpReady(arg.nics_found.length > 3 ? ReadyState.Ready : ReadyState.Error);
             setAudioReady(arg.audio_ready ? ReadyState.Ready : ReadyState.Error);
             setErrors(arg.errors);
+            setReady(true);
         });
         window.electron.ipcRenderer.sendMessage('hwcheck', []);
     }, []); // only run once
-
-    const ReadyHandeler = ({ ready }: { ready: ReadyState }) => {
-        switch (ready) {
-            case ReadyState.NotReady:
-                return <Spin />;
-            case ReadyState.Ready:
-                return <CheckCircleOutlined />;
-            case ReadyState.Error:
-                return <WarningOutlined />;
-        }
-    }
-
-    const ready = () => networkReady === ReadyState.Ready && ipReady === ReadyState.Ready && audioReady === ReadyState.Ready
 
     return (
         <>
@@ -74,7 +58,7 @@ const HWCheck = ({ nextStep, previousStep }: Steppable) => {
                 </Row>
             </Space>
 
-            <StepBar nextStep={nextStep} previousStep={previousStep} showNext showPrev nextDisabled={!ready()} />
+            <StepBar nextStep={nextStep} previousStep={previousStep} showNext showPrev nextDisabled={!ready} />
         </>
     )
 };
