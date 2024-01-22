@@ -1,4 +1,3 @@
-import { CheckCircleOutlined, WarningOutlined } from "@ant-design/icons";
 import { Col, Row, Space, Spin, Typography } from "antd";
 import HWCheckResponse from "models/HWCheckResponse";
 import { Steppable } from "models/steppable";

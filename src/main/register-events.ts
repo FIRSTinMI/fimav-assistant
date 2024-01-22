@@ -8,8 +8,8 @@ import { alertsWindow } from './window_components/alertsWindow';
 // Use this file to register all events. For uniformity, all events should send their response as <event-name>-response
 
 export function registerAllEvents(ipc: IpcMain) {
-  ipc.on('hwcheck', (event, arg) => {
-    const out = HWCheck();
+  ipc.on('hwcheck', async (event, arg) => {
+    const out = await HWCheck();
     event.reply('hwcheck-response', out);
   });
 
