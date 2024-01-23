@@ -4,13 +4,13 @@ import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu';
-import { AUTOAV_BACKGROUND_THREAD_PATH, BACKGROUND_THREAD_PATH, RESOURCES_PATH, getAssetPath, resolveHtmlPath } from './util';
+import { RESOURCES_PATH, getAssetPath, resolveHtmlPath } from './util';
 import { registerAllEvents } from './register-events';
 import { createStore } from './store';
 import setupSignalR from './window_components/signalR';
 import buildTray from './window_components/tray';
 import createAlertsWindow from './window_components/alertsWindow';
-const { Worker } = require('node:worker_threads');
+import Addons from './addons';
 
 class AppUpdater {
     constructor() {
@@ -23,8 +23,11 @@ class AppUpdater {
 let mainWindow: BrowserWindow | null = null;
 let appIsQuitting = false;
 
+// Addons
+const addons = new Addons().init();
+
 // Register all the event handlers
-registerAllEvents(ipcMain);
+registerAllEvents(ipcMain, addons);
 
 if (process.env.NODE_ENV === 'production') {
     const sourceMapSupport = require('source-map-support');
@@ -95,7 +98,7 @@ const createWindow = async () => {
         return true;
     });
 
-    const menuBuilder = new MenuBuilder(mainWindow);
+    const menuBuilder = new MenuBuilder(mainWindow, addons);
     menuBuilder.buildMenu();
 
     // Open urls in the user's browser
@@ -127,6 +130,7 @@ app
             // Ctrl + Q to quit
             globalShortcut.register('CommandOrControl+Q', () => {
                 appIsQuitting = true;
+                addons.stop();
                 app.quit();
             });
         }
@@ -138,16 +142,6 @@ app
         if (store.get('apiKey')) {
             setupSignalR(store, createAlertsWindow);
         }
-
-        const autoav = new Worker(AUTOAV_BACKGROUND_THREAD_PATH);
-
-        autoav.on('message', (msg: string) => {
-            console.log('From AutoAV:', msg);
-        });
-
-        autoav.on('error', (msg: string) => {
-            console.error('From AutoAV:', msg);
-        });
 
         app.on('activate', () => {
             // On macOS it's common to re-create a window in the app when the

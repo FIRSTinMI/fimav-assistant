@@ -32,3 +32,5 @@ export const AUTOAV_BACKGROUND_THREAD_PATH = app.isPackaged
 export const getResourcePath = (...paths: string[]): string => {
   return path.join(RESOURCES_PATH, ...paths);
 };
+
+export const appdataPath = path.join(process.env.APPDATA ?? "C:\\Users\\Public", 'fimav-assistant');

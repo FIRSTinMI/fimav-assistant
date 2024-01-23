@@ -4,10 +4,11 @@ import HWCheck from './events/HWCheck';
 import Alerts from './events/Alerts';
 import { dismissAlert } from './window_components/signalR';
 import { alertsWindow } from './window_components/alertsWindow';
+import Addons from './addons';
 
 // Use this file to register all events. For uniformity, all events should send their response as <event-name>-response
 
-export function registerAllEvents(ipc: IpcMain) {
+export function registerAllEvents(ipc: IpcMain, addons: Addons) {
   ipc.on('hwcheck', async (event, arg) => {
     const out = await HWCheck();
     event.reply('hwcheck-response', out);
