@@ -10,7 +10,7 @@ import { BundleAnalyzerPlugin } from 'webpack-bundle-analyzer';
 import baseConfig from './webpack.config.base';
 import webpackPaths from './webpack.paths';
 import checkNodeEnv from '../scripts/check-node-env';
-import deleteSourceMaps from '../scripts/delete-source-maps';
+import CopyPlugin from 'copy-webpack-plugin';
 
 checkNodeEnv('production');
 // deleteSourceMaps();
@@ -25,7 +25,6 @@ const configuration: webpack.Configuration = {
   entry: {
     main: path.join(webpackPaths.srcMainPath, 'main.ts'),
     preload: path.join(webpackPaths.srcMainPath, 'preload.ts'),
-    backgroundThread: path.join(webpackPaths.srcMainPath, 'backgroundThread.ts'),
   },
 
   output: {

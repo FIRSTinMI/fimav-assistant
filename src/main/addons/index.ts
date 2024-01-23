@@ -1,14 +1,14 @@
-import { AUTOAV_BACKGROUND_THREAD_PATH, appdataPath } from "../util";
-import { Worker } from 'worker_threads';
+import { appdataPath } from "../util";
 import LiveCaptions from './live-captions'
 import fs from "fs";
 import path from "path";
 import glob from "glob";
+import AutoAV from "./autoav";
 
 export default class Addons {
 
     private liveCaptions: LiveCaptions = LiveCaptions.Instance;
-    private AutoAV: Worker | undefined;
+    private AutoAV: AutoAV = AutoAV.Instance;
 
     public init(): Addons {
         this.restartAll();
@@ -18,7 +18,7 @@ export default class Addons {
     // Kill all addons
     public stop() {
         this.liveCaptions.stop();
-        this.AutoAV?.terminate();
+        this.AutoAV.stop();
     }
 
     // Restart live captions
@@ -36,35 +36,30 @@ export default class Addons {
     // Restart AutoAV
     public restartAutoAV() {
         // Kill the old thread
-        this.AutoAV?.terminate();
+        this.AutoAV.stop();
 
         // Move logs
         this.moveLogs('autoav');
 
         // Start a new thread
-        this.startAutoAV();
+        this.AutoAV.start();
     }
 
     // Restart all
     public restartAll() {
         console.log("📦 Addons Starting...");
 
+        // Stop autoav
+        this.AutoAV.stop();
+
         // Manage logs
         this.manageLogs();
 
-        // Setup live captions
+        // Setup live captions (live-captions handles killing the old thread)
         this.liveCaptions.start();
 
-        // Setup autoav background thread calbacks
-        this.AutoAV?.terminate();
-        this.startAutoAV();
-    }
-
-    // Start the AutoAV background thread
-    private startAutoAV() {
-        this.AutoAV = new Worker(AUTOAV_BACKGROUND_THREAD_PATH);
-        this.AutoAV.stdout.pipe(fs.createWriteStream(path.join(appdataPath, 'logs', 'autoav.out.log')));
-        this.AutoAV.stderr.pipe(fs.createWriteStream(path.join(appdataPath, 'logs', 'autoav.err.log')));
+        // Start autoav
+        this.AutoAV.start();
     }
 
     // Manage the logs, removing old and moving old copies to a new folder
