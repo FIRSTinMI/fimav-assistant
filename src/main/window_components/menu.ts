@@ -1,12 +1,11 @@
 import {
-  app,
   Menu,
   shell,
   BrowserWindow,
-  MenuItemConstructorOptions,
-  MenuItem,
+  MenuItemConstructorOptions
 } from 'electron';
 import Addons from 'main/addons';
+import {startAutoUpdate, updateNow} from '../updates/update'
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
   selector?: string;
@@ -90,6 +89,12 @@ export default class MenuBuilder {
             label: 'FIRST in Michigan',
             click() {
               shell.openExternal('https://www.firstinmichigan.org');
+            },
+          },
+          {
+            label: 'Check for Updates (app may restart)',
+            click() {
+              updateNow();
             },
           },
         ],

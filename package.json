@@ -13,13 +13,13 @@
     "hot",
     "reload"
   ],
-  "homepage": "https://github.com/techno11/fimav-assistant#readme",
+  "homepage": "https://github.com/firstinmi/fimav-assistant#readme",
   "bugs": {
-    "url": "https://github.com/techno11/fimav-assistant/issues"
+    "url": "https://github.com/firstinmi/fimav-assistant/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/techno11/fimav-assistant.git"
+    "url": "git+https://github.com/firstinmi/fimav-assistant.git"
   },
   "license": "MIT",
   "author": {
@@ -103,7 +103,8 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.1",
-    "systeminformation": "^5.21.8"
+    "systeminformation": "^5.21.8",
+    "update-electron-app": "^3.0.0"
   },
   "devDependencies": {
     "@electron/notarize": "^1.2.3",
