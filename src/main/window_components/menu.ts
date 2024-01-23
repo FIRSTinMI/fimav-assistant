@@ -60,14 +60,14 @@ export default class MenuBuilder {
             label: 'Reload',
             accelerator: 'CommandOrControl+R',
             click: () => {
-              this.mainWindow.webContents.reload();
+              BrowserWindow.getFocusedWindow()?.webContents.reload();
             },
           },
           {
             label: 'Toggle Developer Tools',
             accelerator: 'Alt+CommandOrControl+I',
             click: () => {
-              this.mainWindow.webContents.toggleDevTools();
+              BrowserWindow.getFocusedWindow()?.webContents.toggleDevTools();
             },
           },
         ],

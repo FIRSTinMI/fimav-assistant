@@ -3,10 +3,13 @@ import path from 'path';
 import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu';
-import { resolveHtmlPath } from './util';
+import { RESOURCES_PATH, getAssetPath, resolveHtmlPath } from './util';
 import { registerAllEvents } from './register-events';
+import { createStore } from './store';
+import setupSignalR from './window_components/signalR';
 import buildTray from './window_components/tray';
 import { startAutoUpdate } from './updates/update'
+import createAlertsWindow from './window_components/alertsWindow';
 
 class AppUpdater {
   constructor() {
@@ -16,12 +19,6 @@ class AppUpdater {
 
 let mainWindow: BrowserWindow | null = null;
 let appIsQuitting = false;
-
-ipcMain.on('ipc-example', async (event, arg) => {
-  const msgTemplate = (pingPong: string) => `IPC test: ${pingPong}`;
-  console.log(msgTemplate(arg));
-  event.reply('ipc-example', msgTemplate('pong'));
-});
 
 // Register all the event handlers
 registerAllEvents(ipcMain);
@@ -37,13 +34,13 @@ const isDebug =
   process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 if (isDebug) {
-  require('electron-debug')();
+  require('electron-debug')({ showDevTools: false });
 }
 
 const installExtensions = async () => {
   const installer = require('electron-devtools-installer');
   const forceDownload = !!process.env.UPGRADE_EXTENSIONS;
-  const extensions = ['REACT_DEVELOPER_TOOLS'];
+  const extensions: string[] = [];
 
   return installer
     .default(
@@ -53,14 +50,7 @@ const installExtensions = async () => {
     .catch(console.log);
 };
 
-const RESOURCES_PATH = app.isPackaged
-  ? path.join(process.resourcesPath, 'assets')
-  : path.join(__dirname, '../../assets');
-
-const getAssetPath = (...paths: string[]): string => {
-  return path.join(RESOURCES_PATH, ...paths);
-};
-
+/** Create the main window */
 const createWindow = async () => {
   if (isDebug) {
     await installExtensions();
@@ -118,14 +108,18 @@ const createWindow = async () => {
   new AppUpdater();
 };
 
+/**
+ * Add event listeners...
+ */
 app.on('window-all-closed', () => {
-  app.quit();
+  // app.quit();
 });
 
 app
   .whenReady()
   .then(() => {
     createWindow();
+    const store = createStore();
 
     // Register Shortcuts
     if (!app.isPackaged) {
@@ -138,6 +132,11 @@ app
 
     // Register Tray Icon
     buildTray(mainWindow, RESOURCES_PATH, app.getVersion());
+
+    // TODO: Currently the API key is set manually by opening the config.json file
+    if (store.get('apiKey')) {
+      setupSignalR(store, createAlertsWindow);
+    }
 
     app.on('activate', () => {
       // On macOS it's common to re-create a window in the app when the
