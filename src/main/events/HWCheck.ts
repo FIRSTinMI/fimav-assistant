@@ -35,6 +35,12 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
         }
     }
 
+    if (process.platform !== "win32") {
+        resp.unofficial_hw = true;
+        resp.errors.push("This software is only supported on Windows.  Please contact FIMAV Support for assistance.");
+        return resp;
+    }
+
     // Get Computer Name
     const whoAmI = hostname();
 
