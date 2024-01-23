@@ -15,17 +15,34 @@ export default class Addons {
         return this;
     }
 
+    // Kill all addons
+    public stop() {
+        this.liveCaptions.stop();
+        this.AutoAV?.terminate();
+    }
+
     // Restart live captions
-    public restartLiveCaptions() {
-        this.liveCaptions.restart();
+    public async restartLiveCaptions() {
+        // Stop live captions
+        await this.liveCaptions.stop();
+
+        // Move logs
+        this.moveLogs('live-captions');
+
+        // Start live captions
+        await this.liveCaptions.start();
     }
 
     // Restart AutoAV
     public restartAutoAV() {
+        // Kill the old thread
         this.AutoAV?.terminate();
-        this.AutoAV = new Worker(AUTOAV_BACKGROUND_THREAD_PATH);
-        this.AutoAV.stdout.pipe(fs.createWriteStream(path.join(appdataPath, 'logs', 'autoav.out.log')));
-        this.AutoAV.stderr.pipe(fs.createWriteStream(path.join(appdataPath, 'logs', 'autoav.err.log')));
+
+        // Move logs
+        this.moveLogs('autoav');
+
+        // Start a new thread
+        this.startAutoAV();
     }
 
     // Restart all
@@ -39,9 +56,16 @@ export default class Addons {
         this.liveCaptions.start();
 
         // Setup autoav background thread calbacks
-        this.restartAutoAV();
+        this.AutoAV?.terminate();
+        this.startAutoAV();
     }
 
+    // Start the AutoAV background thread
+    private startAutoAV() {
+        this.AutoAV = new Worker(AUTOAV_BACKGROUND_THREAD_PATH);
+        this.AutoAV.stdout.pipe(fs.createWriteStream(path.join(appdataPath, 'logs', 'autoav.out.log')));
+        this.AutoAV.stderr.pipe(fs.createWriteStream(path.join(appdataPath, 'logs', 'autoav.err.log')));
+    }
 
     // Manage the logs, removing old and moving old copies to a new folder
     private manageLogs() {
@@ -89,10 +113,17 @@ export default class Addons {
         });
     }
 
-    // Kill all addons
-    public stop() {
-        this.liveCaptions.stop();
-        this.AutoAV?.terminate();
+    // Move logs with a name
+    private moveLogs(name: string) {
+        try {
+            // Move logs
+            const folderName = Date.now().toString(); // Time now
+            fs.mkdirSync(path.join(appdataPath, 'logs', folderName)); // Make a new folder
+            fs.renameSync(path.join(appdataPath, 'logs', `${name}.out.log`), path.join(appdataPath, 'logs', folderName, `${name}.out.log`));
+            fs.renameSync(path.join(appdataPath, 'logs', `${name}.err.log`), path.join(appdataPath, 'logs', folderName, `${name}.err.log`));
+        } catch {
+            // Do nothing
+        }
     }
 
 }
