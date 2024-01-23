@@ -1,7 +1,6 @@
 /* eslint global-require: off, no-console: off, promise/always-return: off */
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
-import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu';
 import { RESOURCES_PATH, getAssetPath, resolveHtmlPath } from './util';
@@ -9,13 +8,12 @@ import { registerAllEvents } from './register-events';
 import { createStore } from './store';
 import setupSignalR from './window_components/signalR';
 import buildTray from './window_components/tray';
+import { startAutoUpdate } from './updates/update'
 import createAlertsWindow from './window_components/alertsWindow';
 
 class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
-    autoUpdater.logger = log;
-    autoUpdater.checkForUpdatesAndNotify();
   }
 }
 
@@ -28,6 +26,8 @@ registerAllEvents(ipcMain);
 if (process.env.NODE_ENV === 'production') {
   const sourceMapSupport = require('source-map-support');
   sourceMapSupport.install();
+  // setup auto update
+  startAutoUpdate();
 }
 
 const isDebug =
