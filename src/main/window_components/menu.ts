@@ -5,7 +5,9 @@ import {
   MenuItemConstructorOptions
 } from 'electron';
 import Addons from 'main/addons';
-import {startAutoUpdate, updateNow} from '../updates/update'
+import { updateNow } from '../updates/update'
+import { appdataPath } from '../util';
+import path from 'path';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
   selector?: string;
@@ -92,6 +94,12 @@ export default class MenuBuilder {
             },
           },
           {
+            label: 'View Logs',
+            click() {
+              shell.openPath(path.join(appdataPath, 'logs'));
+            },
+          },
+          {
             label: 'Check for Updates (app may restart)',
             click() {
               updateNow();
@@ -135,6 +143,7 @@ export default class MenuBuilder {
       minimizable: false,
       maximizable: false,
       fullscreenable: false,
+      autoHideMenuBar: true,
       title: 'Live Captions',
       webPreferences: {
         // preload: `Array.from(document.getElementsByClassName("tabs")).forEach(c => c.remove())`
