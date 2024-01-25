@@ -1,5 +1,6 @@
 {
   "description": "AV Assistant application for FiM AV Voluenteers",
+  "version": "0.0.1",
   "name": "us.fimav.assistant",
   "keywords": [
     "electron",
@@ -96,9 +97,12 @@
     "electron-log": "^4.4.8",
     "electron-store": "^8.1.0",
     "electron-updater": "^5.3.0",
+    "node-fetch": "^2.7.0",
+    "ping": "^0.4.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.1",
+    "systeminformation": "^5.21.8",
     "update-electron-app": "^3.0.0"
   },
   "devDependencies": {
@@ -111,6 +115,8 @@
     "@testing-library/react": "^13.4.0",
     "@types/jest": "^29.4.0",
     "@types/node": "18.13.0",
+    "@types/node-fetch": "^2.6.6",
+    "@types/ping": "^0.4.2",
     "@types/react": "^18.0.27",
     "@types/react-dom": "^18.0.10",
     "@types/react-test-renderer": "^18.0.0",
@@ -121,6 +127,7 @@
     "browserslist-config-erb": "^0.0.3",
     "chalk": "^4.1.2",
     "concurrently": "^7.6.0",
+    "copy-webpack-plugin": "^12.0.2",
     "core-js": "^3.27.2",
     "cross-env": "^7.0.3",
     "css-loader": "^6.7.3",

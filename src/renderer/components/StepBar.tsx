@@ -56,7 +56,7 @@ const StepBar = ({ nextStep, previousStep, showNext, showPrev, beforeNext, befor
     }
 
     return (
-        <Row style={{ position: "absolute", bottom: "43px", left: 0, width: '100%' }}>
+        <Row gutter={2} style={{ position: "fixed", bottom: "43px", left: 0, width: '100%', paddingLeft: "10px" }}>
             <Col span={8}>
                 {showPrev &&
                     <Button

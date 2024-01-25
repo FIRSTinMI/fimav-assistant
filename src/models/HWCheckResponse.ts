@@ -1,9 +1,32 @@
 export default interface HWCheckResponse {
-    ip_ready: boolean;
-    audio_ready: boolean;
-    network_ready: boolean;
-    venue_static_ip?: string;
-    av_static_ip?: string;
-    unofficial_hw: boolean;
+    audio_ready: boolean,
+    venue_ip_ready: boolean,
+    field_ip_ready: boolean,
+    av_ip_ready: boolean,
+    unofficial_hw: boolean,
+    field_nic_used: "Unknown" | "VLAN" | "Secondary"
+    cart_number: number,
+    errors: string[],
+    logs: string[],
+    nics_found: string[],
+    audio_devices_found: AudioDeviceStatus[],
+    device_statuses: {
+        mixer: boolean,
+        switch: boolean,
+        ptz1: boolean,
+        ptz2: boolean,
+    }
+}
 
+export interface AudioDeviceStatus {
+    name: string;
+    sub_name: string;
+    id: string | number;
+    type: string;
+    device_type: "Capture" | "Render" | "";
+    volume_percent: string;
+    default: "Render" | "Capture" | "";
+    muted: boolean;
+    control_id: string;
+    registry_key: string;
 }

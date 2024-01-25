@@ -9,6 +9,10 @@ import { dependencies as externals } from '../../release/app/package.json';
 
 const configuration: webpack.Configuration = {
   externals: [...Object.keys(externals || {})],
+  
+  experiments: {
+    topLevelAwait: true
+  },
 
   stats: 'errors-only',
 

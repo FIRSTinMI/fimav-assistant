@@ -24,3 +24,9 @@ export const RESOURCES_PATH = app.isPackaged
 export function getAssetPath(...paths: string[]): string {
   return path.join(RESOURCES_PATH, ...paths);
 }
+
+export const getResourcePath = (...paths: string[]): string => {
+  return path.join(RESOURCES_PATH, ...paths);
+};
+
+export const appdataPath = app.getPath('userData');
