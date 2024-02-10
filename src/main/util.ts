@@ -14,7 +14,7 @@ export function resolveHtmlPath(
     if (anchor) url.hash = anchor;
     return url.href;
   }
-  return `file://${path.resolve(__dirname, '../renderer/', htmlFileName)}`;
+  return `file://${path.resolve(__dirname, '../renderer/', htmlFileName + (anchor ? `#${anchor}` : ''))}`;
 }
 
 export const RESOURCES_PATH = app.isPackaged
