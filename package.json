@@ -201,8 +201,8 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "fimav-assistant",
-      "repo": "finav0assistant"
+      "owner": "firstinmi",
+      "repo": "fimav-assistant"
     }
   },
   "devEngines": {
