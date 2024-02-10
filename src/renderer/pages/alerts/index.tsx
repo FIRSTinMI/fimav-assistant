@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 
 const Alerts = () => {
+  if (!window.electron) return;
   const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   useEffect(() => {

@@ -57,7 +57,7 @@ const installExtensions = async () => {
 
 /** Create the main window */
 const createWindow = async () => {
-    if (isDebug) {
+    if (true || isDebug) {
         await installExtensions();
     }
 
