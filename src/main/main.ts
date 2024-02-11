@@ -52,7 +52,7 @@ const installExtensions = async () => {
             extensions.map((name) => installer[name]),
             forceDownload
         )
-        .catch(console.log);
+        .catch(log.error);
 };
 
 /** Create the main window */
@@ -120,7 +120,19 @@ app.on('window-all-closed', () => {
     // app.quit();
 });
 
-app
+const instanceLock = app.requestSingleInstanceLock();
+if (!instanceLock) {
+    // This is a second instance, we only want one at a time
+    app.quit();
+} else {
+    app.on('second-instance', (evt) => {
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+
+    app
     .whenReady()
     .then(() => {
         createWindow();
@@ -150,4 +162,5 @@ app
             if (mainWindow === null) createWindow();
         });
     })
-    .catch(console.log);
+    .catch(log.error);
+}

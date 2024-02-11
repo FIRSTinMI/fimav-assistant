@@ -1,9 +1,9 @@
-import { updateElectronApp, UpdateSourceType } from 'update-electron-app';
-import electron, { autoUpdater } from 'electron';
+import { updateElectronApp } from 'update-electron-app';
+import { autoUpdater } from 'electron';
 
 export function startAutoUpdate() {
   // Handle update-downloaded event
-  autoUpdater.on('update-downloaded', (event, releaseNotes, releaseName) => {
+  autoUpdater.on('update-downloaded', () => {
     // Yolo I guess 🤷‍♀️
     autoUpdater.quitAndInstall();
   });
