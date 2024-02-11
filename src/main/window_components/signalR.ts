@@ -3,6 +3,7 @@ import log from 'electron-log';
 import Store from 'electron-store';
 import { SetPendingAlerts } from '../events/Alerts';
 import { AppConfig } from "main/store";
+import { signalrToElectronLog } from "../util";
 
 let signalRConnection: HubConnection | null = null;
 
@@ -23,29 +24,7 @@ export default function setupSignalR(store: Store<AppConfig>, createAlertsWindow
     })
     .configureLogging({
       log(logLevel, message) {
-        switch (logLevel) {
-          case LogLevel.Trace:
-            log.info(message);
-            break;
-          case LogLevel.Debug:
-            log.info(message);
-            break;
-          case LogLevel.Information:
-            log.info(message);
-            break;
-          case LogLevel.Warning:
-            log.warn(message);
-            break;
-          case LogLevel.Error:
-            log.error(message);
-            break;
-          case LogLevel.Critical:
-            log.error(message);
-            break;
-          case LogLevel.None:
-            log.info(message);
-            break;
-        }
+        signalrToElectronLog(log, logLevel, message);
       },
     }).build();
 

@@ -1,5 +1,6 @@
 import { updateElectronApp } from 'update-electron-app';
 import { autoUpdater } from 'electron';
+import log from 'electron-log';
 
 export function startAutoUpdate() {
   // Handle update-downloaded event
@@ -11,6 +12,7 @@ export function startAutoUpdate() {
   updateElectronApp({
     updateInterval: '10 minutes',
     notifyUser: false, // We'll handle this ourselves ;)
+    logger: log
   });
 }
 

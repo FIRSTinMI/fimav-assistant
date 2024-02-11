@@ -3,9 +3,9 @@ import nodeFetch from 'node-fetch';
 import VmixRecordingService from '../../services/VmixRecordingService';
 import FMSMatchStatus from '../../models/FMSMatchState';
 import attemptRename from '../../utils/recording';
-import fs from 'fs';
-import path from 'path';
-import { appdataPath } from '../util';
+import log from 'electron-log';
+import { AddonLoggers } from '.';
+import { signalrToElectronLog } from '../util';
 
 
 export default class AutoAV {
@@ -18,13 +18,19 @@ export default class AutoAV {
     private lastState: FMSMatchStatus | null = null;
     private hubConnection: HubConnection | null = null;
 
+    private logs: AddonLoggers | null = null;
+
+    constructor() {
+        // Start new log files
+        this.logs = {
+            out: log.scope("autoav.out"),
+            err: log.scope("autoav.err")
+        };
+    }
+
 
     // Start AutoAV
     public start() {
-        // Start new log files
-        fs.writeFileSync(path.join(appdataPath, 'logs', 'autoav.out.log'), '');
-        fs.writeFileSync(path.join(appdataPath, 'logs', 'autoav.err.log'), '');
-
         // Notify Parent logs that we're running
         this.log('AutoAV Service Started');
 
@@ -38,6 +44,11 @@ export default class AutoAV {
         // Build a connection to the SignalR Hub
         this.hubConnection = new HubConnectionBuilder()
             .withUrl('http://10.0.100.5:8189/infrastructureHub')
+            .configureLogging({
+                log: (logLevel, message) => {
+                    signalrToElectronLog(this.logs?.out ?? null, logLevel, message)
+                },
+            })
             .withAutomaticReconnect()
             .build();
 
@@ -138,7 +149,8 @@ export default class AutoAV {
 
     // Log a message
     private log(msg: string, severity: 'out' | 'err' = 'out') {
-        fs.appendFileSync(path.join(appdataPath, 'logs', `autoav.${severity}.log`), `${new Date().toISOString()} - ${msg}\n`, { flag: 'a' });
+        if (!this.logs) throw new Error('Loggers have not been configured.');
+        this.logs[severity].log(msg);
     }
 
     public static get Instance(): AutoAV {

@@ -1,19 +1,24 @@
-/* eslint global-require: off, no-console: off, promise/always-return: off */
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu';
-import { RESOURCES_PATH, getAssetPath, resolveHtmlPath } from './util';
+import { RESOURCES_PATH, getAssetPath, logsPath, resolveHtmlPath } from './util';
 import { registerAllEvents } from './register-events';
-import { createStore } from './store';
+import { getStore } from './store';
 import setupSignalR from './window_components/signalR';
 import buildTray from './window_components/tray';
 import { startAutoUpdate } from './updates/update'
 import createAlertsWindow from './window_components/alertsWindow';
 import Addons from './addons';
 
-class AppUpdater {
+log.transports.file.resolvePath = (variables, message) => {
+    const scope = typeof message?.scope === 'string' ? message.scope : message?.scope?.label;
+    let fileName = scope ?? variables.fileName ?? 'main';
+    if (!fileName.endsWith('.log')) fileName += '.log';
+    return path.join(logsPath, fileName);
+};
 
+class AppUpdater {
   constructor() {
     log.transports.file.level = 'info';
   }
@@ -123,12 +128,16 @@ app.on('window-all-closed', () => {
 const instanceLock = app.requestSingleInstanceLock();
 if (!instanceLock) {
     // This is a second instance, we only want one at a time
+    if (isDebug) log.error('Tried to open another instance while the old one was still open. New changes will not be reflected.')
     app.quit();
 } else {
-    app.on('second-instance', (evt) => {
+    app.on('second-instance', () => {
+        if (isDebug) log.error('Tried to open another instance while the old one was still open. New changes will not be reflected.');
         if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
+        } else {
+            createWindow();
         }
     });
 
@@ -136,10 +145,10 @@ if (!instanceLock) {
     .whenReady()
     .then(() => {
         createWindow();
-        const store = createStore();
+        const store = getStore();
 
         // Register Shortcuts
-        if (!app.isPackaged) {
+        if (process.env.ALLOW_QUIT === 'true' || !app.isPackaged) {
             // Ctrl + Q to quit
             globalShortcut.register('CommandOrControl+Q', () => {
                 appIsQuitting = true;

@@ -1,9 +1,10 @@
-import { appdataPath } from "../util";
+import { logsPath } from "../util";
 import LiveCaptions from './live-captions'
 import fs from "fs";
 import path from "path";
 import glob from "glob";
 import AutoAV from "./autoav";
+import log, { LogFunctions } from "electron-log";
 
 export default class Addons {
 
@@ -26,9 +27,6 @@ export default class Addons {
         // Stop live captions
         await this.liveCaptions.stop();
 
-        // Move logs
-        this.moveLogs('live-captions');
-
         // Start live captions
         await this.liveCaptions.start();
     }
@@ -38,16 +36,13 @@ export default class Addons {
         // Kill the old thread
         this.AutoAV.stop();
 
-        // Move logs
-        this.moveLogs('autoav');
-
         // Start a new thread
         this.AutoAV.start();
     }
 
     // Restart all
     public restartAll() {
-        console.log("📦 Addons Starting...");
+        log.info("📦 Addons Starting...");
 
         // Stop autoav
         this.AutoAV.stop();
@@ -65,12 +60,12 @@ export default class Addons {
     // Manage the logs, removing old and moving old copies to a new folder
     private manageLogs() {
         // Make a log folder if it doesn't exist
-        if (!fs.existsSync(path.join(appdataPath, 'logs'))) {
-            fs.mkdirSync(path.join(appdataPath, 'logs'));
+        if (!fs.existsSync(logsPath)) {
+            fs.mkdirSync(logsPath);
         }
 
         // Get folders in the logs directory
-        const folders = fs.readdirSync(path.join(appdataPath, 'logs'));
+        const folders = fs.readdirSync(logsPath);
 
         // Folder names are timestamps, filter unparsable timestamps
         const filteredFolders = folders.filter((f: any) => {
@@ -91,34 +86,25 @@ export default class Addons {
             const diff = now.getTime() - date.getTime();
             const days = diff / (1000 * 60 * 60 * 24);
             if (days > 7) {
-                fs.rmdirSync(path.join(appdataPath, 'logs', f), { recursive: true });
+                fs.rmdirSync(path.join(logsPath, f), { recursive: true });
             }
         });
 
         // Move the current logs to a timestamped folder
         const folderName = Date.now().toString()
-        fs.mkdirSync(path.join(appdataPath, 'logs', folderName));
+        fs.mkdirSync(path.join(logsPath, folderName));
 
         // Find all *.log files in the logs directory
-        const files = glob.sync(path.join(appdataPath, 'logs', '*.log'));
+        const files = glob.sync(path.join(logsPath, '*.log'));
 
         // Move each file to the new folder
         files.forEach((f) => {
-            fs.renameSync(f, path.join(appdataPath, 'logs', folderName, path.basename(f)));
+            fs.renameSync(f, path.join(logsPath, folderName, path.basename(f)));
         });
     }
+}
 
-    // Move logs with a name
-    private moveLogs(name: string) {
-        try {
-            // Move logs
-            const folderName = Date.now().toString(); // Time now
-            fs.mkdirSync(path.join(appdataPath, 'logs', folderName)); // Make a new folder
-            fs.renameSync(path.join(appdataPath, 'logs', `${name}.out.log`), path.join(appdataPath, 'logs', folderName, `${name}.out.log`));
-            fs.renameSync(path.join(appdataPath, 'logs', `${name}.err.log`), path.join(appdataPath, 'logs', folderName, `${name}.err.log`));
-        } catch {
-            // Do nothing
-        }
-    }
-
+export type AddonLoggers = {
+    out: LogFunctions,
+    err: LogFunctions
 }

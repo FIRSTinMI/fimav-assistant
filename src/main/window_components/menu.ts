@@ -6,7 +6,7 @@ import {
 } from 'electron';
 import Addons from 'main/addons';
 import { updateNow } from '../updates/update'
-import { appdataPath } from '../util';
+import { logsPath } from '../util';
 import path from 'path';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
@@ -96,7 +96,7 @@ export default class MenuBuilder {
           {
             label: 'View Logs',
             click() {
-              shell.openPath(path.join(appdataPath, 'logs'));
+              shell.openPath(logsPath);
             },
           },
           {
