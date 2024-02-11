@@ -12,7 +12,7 @@ export default async function attemptRename(
         try {
             // VMix video location exists
             if (!fs.existsSync(videoLocation)) {
-                reject('Video location does not exist');
+                reject(new Error('Video location does not exist'));
                 return;
             }
 
@@ -24,7 +24,7 @@ export default async function attemptRename(
             let closestFileDate: Date | null = null;
 
             // Loop over all files in directory
-            for (const file of files) {
+            files.every((file) => {
                 const fileDate = vmixFilenameToDate(file);
                 if (fileDate !== null) {
                     const diff = Math.abs(
@@ -33,14 +33,16 @@ export default async function attemptRename(
                     if (diff < 5000) {
                         closestFile = file;
                         closestFileDate = fileDate;
-                        break;
+                        return false;
                     }
                 }
-            }
+
+                return true;
+            })
 
             // If we didn't find a file, fail
             if (closestFile === null || closestFileDate === null) {
-                reject('Could not find a matching file to rename');
+                reject(new Error('Could not find a matching file to rename'));
                 return;
             }
 
@@ -85,12 +87,12 @@ function vmixFilenameToDate(filename: string): Date | null {
 
     // Translate to date object
     const date = new Date();
-    date.setFullYear(parseInt(year));
-    date.setMonth(parseInt(month) - 1);
-    date.setDate(parseInt(day));
-    date.setHours(parseInt(hour) + (ampm === 'PM' ? 12 : 0));
-    date.setMinutes(parseInt(minute));
-    date.setSeconds(parseInt(second));
+    date.setFullYear(parseInt(year, 10));
+    date.setMonth(parseInt(month, 10) - 1);
+    date.setDate(parseInt(day, 10));
+    date.setHours(parseInt(hour, 10) + (ampm === 'PM' ? 12 : 0));
+    date.setMinutes(parseInt(minute, 10));
+    date.setSeconds(parseInt(second, 10));
     date.setMilliseconds(0);
     return date;
 }

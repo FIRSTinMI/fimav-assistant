@@ -18,6 +18,7 @@ function Welcome() {
                 className="logo-bounce"
                 src={FiMLogo}
                 style={{ width: '30%', height: '30%' }}
+                alt="FIRST in Michigan logo"
             />
             <Typography.Title level={1} style={{ marginTop: 0 }}>
                 Welcome!
@@ -28,7 +29,7 @@ function Welcome() {
             </Typography.Title>
 
             <Button type="primary" size="large" onClick={handleNext}>
-                Let's Get Started <RightOutlined className="btn-icon-bounce" />
+                Let&apos;s Get Started <RightOutlined className="btn-icon-bounce" />
             </Button>
         </Space>
     );

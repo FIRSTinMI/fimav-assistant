@@ -1,7 +1,8 @@
+import { differenceInDays, parse } from 'date-fns';
 import fs from 'fs';
 import path from 'path';
 import glob from 'glob';
-import log, { LogFunctions } from 'electron-log';
+import log from 'electron-log';
 import AutoAV from './autoav';
 import LiveCaptions from './live-captions';
 import { logsPath } from '../util';
@@ -48,7 +49,7 @@ export default class Addons {
         this.AutoAV.stop();
 
         // Manage logs
-        this.manageLogs();
+        Addons.manageLogs();
 
         // Setup live captions (live-captions handles killing the old thread)
         this.liveCaptions.start();
@@ -58,7 +59,7 @@ export default class Addons {
     }
 
     // Manage the logs, removing old and moving old copies to a new folder
-    private manageLogs() {
+    private static manageLogs() {
         // Make a log folder if it doesn't exist
         if (!fs.existsSync(logsPath)) {
             fs.mkdirSync(logsPath);
@@ -68,24 +69,20 @@ export default class Addons {
         const folders = fs.readdirSync(logsPath);
 
         // Folder names are timestamps, filter unparsable timestamps
-        const filteredFolders = folders.filter((f: any) => {
-            f = parseInt(f); // attempt to parse folder name as int
-            return !isNaN(Date.parse(f));
+        const filteredFolders = folders.filter((f: string) => {
+            return Addons.parseTimestamp(f) !== null;
         });
 
-        // Sort the folders by date
+        // Sort the folders by date. Since they use epoch time, we can use the timestamp for sorting
         const sortedFolders = filteredFolders.sort((a, b) => {
-            return Date.parse(a) - Date.parse(b);
+            return parseInt(a, 10) - parseInt(b, 10);
         });
 
         // Delete any folders that are older than 7 days
         const now = new Date();
-        sortedFolders.forEach((f: any) => {
-            f = parseInt(f);
-            const date = new Date(Date.parse(f));
-            const diff = now.getTime() - date.getTime();
-            const days = diff / (1000 * 60 * 60 * 24);
-            if (days > 7) {
+        sortedFolders.forEach((f: string) => {
+            const date = Addons.parseTimestamp(f) as Date; // nulls already filtered out
+            if (differenceInDays(date, now) > 7) {
                 fs.rmdirSync(path.join(logsPath, f), { recursive: true });
             }
         });
@@ -102,9 +99,13 @@ export default class Addons {
             fs.renameSync(f, path.join(logsPath, folderName, path.basename(f)));
         });
     }
-}
 
-export type AddonLoggers = {
-    out: LogFunctions;
-    err: LogFunctions;
-};
+    private static parseTimestamp(t: string): Date | null {
+        if (Number.isNaN(parseInt(t, 10))) return null;
+        try {
+            return parse(t, 'T', new Date());
+        } catch {
+            return null;
+        }
+    }
+}

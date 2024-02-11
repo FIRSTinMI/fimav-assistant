@@ -61,6 +61,9 @@ function dismissAlert(id: string): void {
 
     signalRConnection.invoke('MarkAlertRead', id).then(() => {
         log.info('finished dismissing');
+        return undefined;
+    }).catch((err) => {
+        log.error('Failed to dismiss alert', err);
     });
 }
 

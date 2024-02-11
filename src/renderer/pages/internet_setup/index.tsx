@@ -1,9 +1,8 @@
-import { CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
-import { Col, Row, Space, Spin, Typography } from 'antd';
+import { Space, Typography } from 'antd';
 import HWCheckResponse from 'models/HWCheckResponse';
 import { Steppable } from 'models/steppable';
 import { useEffect, useState } from 'react';
-import ReadyHandeler, { ReadyState } from 'renderer/components/ReadyHandeler';
+import ReadyHandler, { ReadyState } from 'renderer/components/ReadyHandler';
 import StepBar from 'renderer/components/StepBar';
 
 function InternetSetup({ nextStep, previousStep }: Steppable) {
@@ -38,7 +37,7 @@ function InternetSetup({ nextStep, previousStep }: Steppable) {
                 </Typography.Text>
 
                 <Typography.Text>
-                    <ReadyHandeler
+                    <ReadyHandler
                         ready={ready ? ReadyState.Ready : ReadyState.NotReady}
                     />{' '}
                     Waiting for Internet...
@@ -47,7 +46,7 @@ function InternetSetup({ nextStep, previousStep }: Steppable) {
                 {errors && errors.length > 0 && (
                     <>
                         <Typography.Text>
-                            Don't worry about any errors below. We'll help you
+                            Don&apos;t worry about any errors below. We&apos;ll help you
                             get these resolved soon!
                         </Typography.Text>
                         {errors.map((error) => (

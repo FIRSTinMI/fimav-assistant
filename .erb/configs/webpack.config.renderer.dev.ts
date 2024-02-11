@@ -121,7 +121,7 @@ const configuration: webpack.Configuration = {
                 new webpack.DllReferencePlugin({
                     context: webpackPaths.dllPath,
                     manifest: require(manifest),
-                      sourceType: 'var',
+                    sourceType: 'var',
                 }),
             ]),
 

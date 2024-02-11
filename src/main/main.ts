@@ -7,8 +7,9 @@ import {
     getAssetPath,
     logsPath,
     resolveHtmlPath,
+    isDebug as isDebugFn
 } from './util';
-import { registerAllEvents } from './register-events';
+import registerAllEvents from './register-events';
 import { getStore } from './store';
 import setupSignalR from './window_components/signalR';
 import buildTray from './window_components/tray';
@@ -34,12 +35,13 @@ class AppUpdater {
 
 let mainWindow: BrowserWindow | null = null;
 let appIsQuitting = false;
+const isDebug = isDebugFn();
 
 // Addons
 const addons = new Addons().init();
 
 // Register all the event handlers
-registerAllEvents(ipcMain, addons);
+registerAllEvents(ipcMain);
 
 if (process.env.NODE_ENV === 'production') {
     const sourceMapSupport = require('source-map-support');
@@ -47,9 +49,6 @@ if (process.env.NODE_ENV === 'production') {
     // setup auto update
     startAutoUpdate();
 }
-
-const isDebug =
-    process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 if (isDebug) {
     require('electron-debug')({ showDevTools: false });
@@ -70,7 +69,7 @@ const installExtensions = async () => {
 
 /** Create the main window */
 const createWindow = async () => {
-    if (true || isDebug) {
+    if (isDebug) {
         await installExtensions();
     }
 
@@ -161,7 +160,7 @@ if (!instanceLock) {
             const store = getStore();
 
             // Register Shortcuts
-            if (process.env.ALLOW_QUIT === 'true' || !app.isPackaged) {
+            if (isDebug) {
                 // Ctrl + Q to quit
                 globalShortcut.register('CommandOrControl+Q', () => {
                     appIsQuitting = true;
@@ -183,6 +182,8 @@ if (!instanceLock) {
                 // dock icon is clicked and there are no other windows open.
                 if (mainWindow === null) createWindow();
             });
+
+            return undefined;
         })
         .catch(log.error);
 }

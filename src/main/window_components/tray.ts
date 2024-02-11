@@ -1,8 +1,8 @@
-import { Menu, Tray } from 'electron';
+import { Menu, Tray, BrowserWindow } from 'electron';
 import path from 'path';
 
 export default function buildTray(
-    mainWindow: Electron.BrowserWindow | null,
+    mainWindow: BrowserWindow | null,
     RESOURCES_PATH: string,
     version: string
 ) {

@@ -5,7 +5,6 @@ import {
     MenuItemConstructorOptions,
 } from 'electron';
 import Addons from 'main/addons';
-import path from 'path';
 import { updateNow } from '../updates/update';
 import { logsPath } from '../util';
 
@@ -55,13 +54,13 @@ export default class MenuBuilder {
                             {
                                 label: 'Settings',
                                 click() {
-                                    that.openLiveCapSettings();
+                                    MenuBuilder.openLiveCapSettings();
                                 },
                             },
                             {
                                 label: 'About',
                                 click() {
-                                    that.openLiveCapSettings('about');
+                                    MenuBuilder.openLiveCapSettings('about');
                                 },
                             },
                         ],
@@ -137,7 +136,7 @@ export default class MenuBuilder {
         return templateDefault;
     }
 
-    openLiveCapSettings(submenu: string = '') {
+    static openLiveCapSettings(submenu: string = '') {
         const window = new BrowserWindow({
             width: 1200,
             height: 800,

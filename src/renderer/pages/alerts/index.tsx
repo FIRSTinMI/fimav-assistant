@@ -4,16 +4,16 @@ import AlertsResponse from 'models/AlertsResponse';
 import { useCallback, useEffect, useState } from 'react';
 
 function Alerts() {
-    if (!window.electron) return <></>;
     const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     useEffect(() => {
+        if (!window.electron) return;
         window.electron.ipcRenderer.on(
             'alerts:alerts',
-            (alerts: AlertsResponse) => {
-                setAlerts(alerts);
+            (resp: AlertsResponse) => {
+                setAlerts(resp);
                 setIsLoading(false);
-                if (alerts.alerts.length == 0) {
+                if (resp.alerts.length === 0) {
                     window.electron.ipcRenderer.sendMessage(
                         'alerts:closeWindow',
                         []
@@ -31,7 +31,7 @@ function Alerts() {
         ]);
     }, []);
 
-    return (
+    return window.electron && (
         <>
             {isLoading && (
                 <div
@@ -59,9 +59,11 @@ function Alerts() {
                     alerts.alerts.map((alert) => (
                         <div key={alert.id}>
                             <div
+                                /* eslint-disable react/no-danger */
                                 dangerouslySetInnerHTML={{
                                     __html: alert.content,
                                 }}
+                                /* eslint-enable react/no-danger */
                             />
                             <div style={{ textAlign: 'center' }}>
                                 <Button

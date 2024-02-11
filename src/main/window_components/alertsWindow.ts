@@ -45,4 +45,6 @@ export default async function createAlertsWindow() {
     });
 }
 
-export { alertsWindow };
+const getAlertsWindow = () => alertsWindow;
+
+export { getAlertsWindow };

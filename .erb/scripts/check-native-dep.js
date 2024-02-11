@@ -24,6 +24,7 @@ if (dependencies) {
         const filteredRootDependencies = rootDependencies.filter(
             (rootDependency) => dependenciesKeys.includes(rootDependency)
         );
+        /* eslint-disable indent */
         if (filteredRootDependencies.length > 0) {
             const plural = filteredRootDependencies.length > 1;
             console.log(`
@@ -50,6 +51,7 @@ ${chalk.bold(
  `);
             process.exit(1);
         }
+        /* eslint-enable indent */
     } catch (e) {
         console.log('Native dependencies could not be checked');
     }

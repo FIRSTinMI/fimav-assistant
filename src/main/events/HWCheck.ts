@@ -1,4 +1,5 @@
 import { spawn } from 'child_process';
+import electronLog, { LogFunctions } from 'electron-log';
 import HWCheckResponse from 'models/HWCheckResponse';
 import SoundVolumeViewOutput from 'models/SoundVolumeViewOutput';
 import { networkInterfaces, hostname, NetworkInterfaceInfo } from 'os';
@@ -21,6 +22,8 @@ const pingConfig = {
 };
 
 export default async function HWCheck(): Promise<HWCheckResponse> {
+    const log = electronLog.scope('HWCheck');
+
     // The response
     const resp: HWCheckResponse = {
         audio_ready: false,
@@ -54,10 +57,10 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     const whoAmI = hostname();
 
     // AV Carts are maned FIMAV<number>, so lets determine which cart we are
-    let cartNumber = parseInt(whoAmI.replace('fimvideo', ''));
+    let cartNumber = parseInt(whoAmI.replace('fimvideo', ''), 10);
 
     // If NaN, we are not an AV Cart
-    const isAVCart = !isNaN(cartNumber);
+    const isAVCart = !Number.isNaN(cartNumber);
 
     // Set cart number to 1 is NaN
     if (!isAVCart) cartNumber = 1;
@@ -67,7 +70,7 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     let vlan10: NetworkInterfaceInfo[] | undefined;
     let vlan20: NetworkInterfaceInfo[] | undefined;
     let vlan30: NetworkInterfaceInfo[] | undefined;
-    let primaryNic: NetworkInterfaceInfo[] | undefined;
+    let primaryNic: NetworkInterfaceInfo[] | undefined; // eslint-disable-line no-unused-vars
     let secondaryNic: NetworkInterfaceInfo[] | undefined;
     let foundCount = 0;
 
@@ -78,20 +81,20 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     Object.keys(interfaces).forEach((key) => {
         if (key === 'Ethernet') {
             primaryNic = interfaces[key];
-            foundCount++;
+            foundCount += 1;
         } else if (key === 'Ethernet 2') {
             secondaryNic = interfaces[key];
-            foundCount++;
+            foundCount += 1;
         } else if (key.toLowerCase().indexOf('vlan') > -1) {
             if (key.indexOf('10') > -1) {
                 vlan10 = interfaces[key];
-                foundCount++;
+                foundCount += 1;
             } else if (key.indexOf('20') > -1) {
                 vlan20 = interfaces[key];
-                foundCount++;
+                foundCount += 1;
             } else if (key.indexOf('30') > -1) {
                 vlan30 = interfaces[key];
-                foundCount++;
+                foundCount += 1;
             }
         }
     });
@@ -107,9 +110,10 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
         await enableDhcp('Ethernet')
             .then(() => {
                 resp.logs.push('Enabled DHCP on Venue VLAN');
+                return undefined;
             })
             .catch((err) => {
-                console.log('Could not enable DHCP on Venue VLAN: ', err);
+                log.error('Could not enable DHCP on Venue VLAN: ', err);
                 resp.errors.push('Failed to enable DHCP on Venue VLAN');
             });
 
@@ -117,9 +121,10 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
         await enableDhcp('Ethernet 2')
             .then(() => {
                 resp.logs.push('Enabled DHCP on Field VLAN');
+                return undefined;
             })
             .catch((err) => {
-                console.log('Could not enable DHCP on Field VLAN: ', err);
+                log.error('Could not enable DHCP on Field VLAN: ', err);
                 resp.errors.push('Failed to enable DHCP on Field VLAN');
             });
 
@@ -139,9 +144,10 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
                     `Set AV VLAN IP was incorrectly set to ${avIp}.  Set static to 192.168.25.${cartNumber}0`
                 );
                 resp.av_ip_ready = true;
+                return undefined;
             })
             .catch((err) => {
-                console.log('Could not set AV VLAN IP: ', err);
+                log.error('Could not set AV VLAN IP: ', err);
                 resp.errors.push(
                     `AV VLAN IP is incorrectly set to ${avIp}, and was unable to be updated. Should be set statically to 192.168.25.${cartNumber}0, subnet mask of 255.255.255.0, and with no gateway`
                 );
@@ -163,21 +169,20 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
         ];
 
         // Wait for all pings to finish
-        await Promise.all(promises)
-            .then((rsp) => {
-                resp.device_statuses = {
-                    mixer: rsp[1].alive,
-                    switch: rsp[0].alive,
-                    ptz1: rsp[2].alive,
-                    ptz2: rsp[3].alive,
-                };
-            })
-            .catch((err) => {
-                resp.errors.push(
-                    "Failed to ping on-cart devices. No worries, we'll set these up later."
-                );
-                console.log('Could not ping on-cart devices: ', err);
-            });
+        try {
+            const rsp = await Promise.all(promises);
+            resp.device_statuses = {
+                switch: rsp[0].alive,
+                mixer: rsp[1].alive,
+                ptz1: rsp[2].alive,
+                ptz2: rsp[3].alive,
+            };
+        } catch (err) {
+            resp.errors.push(
+                "Failed to ping on-cart devices. No worries, we'll set these up later."
+            );
+            log.error('Could not ping on-cart devices: ', err);
+        }
     }
 
     // Check that Venue Vlan has an IP that doesn't start with 169.254
@@ -207,12 +212,12 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     }
 
     // Check audio devices
-    resp.audio_devices_found = await fetchAndParseAudioDevices().catch(
+    resp.audio_devices_found = await fetchAndParseAudioDevices(log).catch(
         (err) => {
             resp.errors.push(
                 'Could not fetch audio devices.  Please contact FIMAV Support.'
             );
-            console.log('Could not fetch audio devices: ', err);
+            log.error('Could not fetch audio devices: ', err);
             return [] as any;
         }
     );
@@ -239,12 +244,13 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
                         `Set BEHRINGER X-AIR 'IN 1-2' as default audio device.`
                     );
                     resp.audio_devices_found[xAirIndex].default = 'Render';
+                    return undefined;
                 })
                 .catch((err) => {
                     resp.errors.push(
                         `Could not set BEHRINGER X-AIR 'IN 1-2' as default audio device.  Please select it from the task bar.`
                     );
-                    console.log('Could not set default device: ', err);
+                    log.error('Could not set default device: ', err);
                     resp.audio_ready = false;
                 });
         }
@@ -254,12 +260,13 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
                 .then(() => {
                     resp.logs.push(`Unmuted BEHRINGER X-AIR 'IN 1-2'`);
                     resp.audio_devices_found[xAirIndex].muted = false;
+                    return undefined;
                 })
                 .catch((err) => {
                     resp.errors.push(
                         `Could not unmute BEHRINGER X-AIR 'IN 1-2'.  Please unmute it from the task bar.`
                     );
-                    console.log('Could not unmute device: ', err);
+                    log.error('Could not unmute device: ', err);
                     resp.audio_ready = false;
                 });
         }
@@ -272,12 +279,13 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
                     );
                     resp.audio_devices_found[xAirIndex].volume_percent =
                         '75.0%';
+                    return undefined;
                 })
                 .catch((err) => {
                     resp.errors.push(
                         `Could not set BEHRINGER X-AIR 'IN 1-2' volume to 75%.  Please set it from the task bar.`
                     );
-                    console.log('Could not set volume: ', err);
+                    log.error('Could not set volume: ', err);
                     resp.audio_ready = false;
                 });
         }
@@ -285,7 +293,7 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
 
     resp.cart_number = cartNumber;
 
-    console.log(resp);
+    log.info(resp);
 
     return resp;
 }
@@ -346,9 +354,9 @@ async function setStaticIp(
     });
 }
 
-async function fetchAndParseAudioDevices(): Promise<SoundVolumeViewOutput[]> {
+async function fetchAndParseAudioDevices(log: LogFunctions): Promise<SoundVolumeViewOutput[]> {
     // Fetch Devices
-    const devices = await getAudioDevices();
+    const devices = await getAudioDevices(log);
 
     // Parse them to pretty
     const parsed = devices.map((a) => ({
@@ -368,8 +376,8 @@ async function fetchAndParseAudioDevices(): Promise<SoundVolumeViewOutput[]> {
     return parsed as any[];
 }
 
-async function getAudioDevices(): Promise<SoundVolumeViewOutput[]> {
-    return new Promise((resolve, reject) => {
+async function getAudioDevices(log: LogFunctions): Promise<SoundVolumeViewOutput[]> {
+    return new Promise((resolve) => {
         // Run .\SoundVolumeView.exe /Sjson
         const proc = spawn(SoundVolumeViewPath, ['/Sjson']);
         let buffer = Buffer.from('');
@@ -408,7 +416,7 @@ async function getAudioDevices(): Promise<SoundVolumeViewOutput[]> {
                     .replaceAll('\\', '\\\\'); // This MUST be last!
                 resolve(JSON.parse(replaced));
             } catch (err) {
-                console.log('Error Parsing JSON: ', err);
+                log.error('Error Parsing JSON: ', err);
                 resolve([]);
             }
         });
@@ -438,6 +446,10 @@ async function runSetSoundCommand(
     cmd: string,
     ...params: string[]
 ): Promise<boolean> {
+    return new Promise((resolve) => {
+        electronLog.debug(cmd, params);
+        resolve(true);
+    });
     /* TODO: investigate further
     return new Promise((resolve, reject) => {
         // Spawn the process
@@ -453,6 +465,4 @@ async function runSetSoundCommand(
         });
     });
 */
-
-    return true;
 }

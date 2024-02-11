@@ -4,11 +4,11 @@ import log from 'electron-log';
 import VmixRecordingService from '../../services/VmixRecordingService';
 import FMSMatchStatus from '../../models/FMSMatchState';
 import attemptRename from '../../utils/recording';
-import { AddonLoggers } from '.';
+import { AddonLoggers } from './addon-loggers';
 import { signalrToElectronLog } from '../util';
 
 export default class AutoAV {
-    private static _instance: AutoAV;
+    private static instance: AutoAV;
 
     // Last Match "Start"
     private lastMatchStartTime: Date | null = null;
@@ -80,6 +80,8 @@ export default class AutoAV {
                             this.log('🔴 Started Recording');
                             this.lastMatchStartData = info;
                             this.lastMatchStartTime = new Date();
+
+                            return undefined;
                         })
                         .catch((err) => {
                             this.log(`‼️ Error Starting Recording: ${err}`);
@@ -118,36 +120,34 @@ export default class AutoAV {
                                     !this.lastMatchStartTime ||
                                     !this.lastMatchStartData
                                 )
-                                    return;
+                                    return undefined;
 
                                 // Start trying to rename file // TODO: Make dynamic and configurable
                                 const recordingLocation =
                                     'C:\\Users\\FIM\\Documents\\vMixStorage';
 
                                 // Attempt to rename the file
-                                await attemptRename(
-                                    'eventName',
-                                    recordingLocation,
-                                    this.lastMatchStartTime,
-                                    this.lastMatchStartData
-                                )
-                                    .then((filename) => {
-                                        // Log the new filename
-                                        this.log(
-                                            `Renamed last recording to ${filename}`
-                                        );
-                                    })
-                                    .catch((err) => {
-                                        // Log the error
-                                        this.log(
-                                            `‼️ Error Renaming Recording: ${err}`
-                                        );
-                                    })
-                                    .finally(() => {
-                                        // Reset the last match start time and data
-                                        this.lastMatchStartTime = null;
-                                        this.lastMatchStartData = null;
-                                    });
+                                try {
+                                    const filename = await attemptRename(
+                                        'eventName',
+                                        recordingLocation,
+                                        this.lastMatchStartTime,
+                                        this.lastMatchStartData
+                                    );
+
+                                    this.log(
+                                        `Renamed last recording to ${filename}`
+                                    );
+                                } catch (err) {
+                                    this.log(
+                                        `‼️ Error Renaming Recording: ${err}`, 'err'
+                                    );
+                                } finally {
+                                    this.lastMatchStartTime = null;
+                                    this.lastMatchStartData = null;
+                                }
+
+                                return undefined;
                             })
                             .catch((err) => {
                                 this.log(`‼️ Error Stopping Recording: ${err}`);
@@ -172,6 +172,8 @@ export default class AutoAV {
             .start()
             .then(() => {
                 this.log('AutoAV FMS Connection Established!');
+
+                return undefined;
             })
             .catch((err) => {
                 this.log(`AutoAV FMS Connection Failed: ${err}`);
@@ -193,6 +195,7 @@ export default class AutoAV {
     }
 
     public static get Instance(): AutoAV {
-        return this._instance || (this._instance = new this());
+        if (!this.instance) this.instance = new this();
+        return this.instance;
     }
 }

@@ -6,11 +6,11 @@ import glob from 'glob';
 import log from 'electron-log';
 import { Readable } from 'node:stream';
 import { appdataPath } from '../util';
-import { AddonLoggers } from '.';
+import { AddonLoggers } from './addon-loggers';
 import { getStore } from '../store';
 
 export default class LiveCaptions {
-    private static _instance: LiveCaptions;
+    private static instance: LiveCaptions;
 
     private running = false;
 
@@ -112,7 +112,7 @@ export default class LiveCaptions {
 
     // Stop the live-captions process
     public stop(): Promise<boolean> {
-        return new Promise<boolean>((resolve, reject) => {
+        return new Promise<boolean>((resolve) => {
             if (!this.running || !this.process || this.process.killed) {
                 resolve(true);
                 return;
@@ -134,7 +134,7 @@ export default class LiveCaptions {
 
     // Run the live-captions process from a path
     private startLiveCaptions(exePath: string): Promise<boolean> {
-        return new Promise<boolean>((resolve, reject) => {
+        return new Promise<boolean>((resolve) => {
             if (this.running || (this.process && !this.process.killed)) {
                 resolve(true);
                 return;
@@ -161,6 +161,7 @@ export default class LiveCaptions {
     }
 
     public static get Instance(): LiveCaptions {
-        return this._instance || (this._instance = new this());
+        if (!this.instance) this.instance = new this();
+        return this.instance;
     }
 }

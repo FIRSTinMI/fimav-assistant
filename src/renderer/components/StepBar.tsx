@@ -1,5 +1,5 @@
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
-import { Button, Col, Row, Space } from 'antd';
+import { Button, Col, Row } from 'antd';
 import { Steppable } from 'models/steppable';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -106,5 +106,14 @@ function StepBar({
         </Row>
     );
 }
+
+StepBar.defaultProps = {
+    showNext: false,
+    showPrev: false,
+    nextDisabled: false,
+    prevDisabled: false,
+    beforeNext: () => {},
+    beforePrev: () => {}
+} as Partial<IProps>;
 
 export default StepBar;

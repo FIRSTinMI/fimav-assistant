@@ -1,9 +1,9 @@
-import { Col, Row, Space, Spin, Typography } from 'antd';
+import { Col, Row, Space, Typography } from 'antd';
 import HWCheckResponse from 'models/HWCheckResponse';
 import { Steppable } from 'models/steppable';
 import { useEffect, useState } from 'react';
 import StepBar from 'renderer/components/StepBar';
-import ReadyHandeler, { ReadyState } from 'renderer/components/ReadyHandeler';
+import ReadyHandler, { ReadyState } from 'renderer/components/ReadyHandler';
 import AVTotes from '../../../../assets/photos/av_totes.png';
 import CameraPelicans from '../../../../assets/photos/camera_pelicans.jpg';
 
@@ -49,24 +49,24 @@ function HWCheck({ nextStep, previousStep }: Steppable) {
                     Hardware Self-Check
                 </Typography.Title>
                 <Typography.Title level={5}>
-                    Hang tight... We're checking to make sure that your AV
+                    Hang tight... We&apos;re checking to make sure that your AV
                     computer is ready for this event!
                 </Typography.Title>
                 <Typography.Text>
-                    <ReadyHandeler ready={networkReady} /> Network Adapters
+                    <ReadyHandler ready={networkReady} /> Network Adapters
                 </Typography.Text>
                 <Typography.Text>
-                    <ReadyHandeler ready={ipReady} /> IP Addresses
+                    <ReadyHandler ready={ipReady} /> IP Addresses
                 </Typography.Text>
                 <Typography.Text>
-                    <ReadyHandeler ready={audioReady} /> Audio Devices
+                    <ReadyHandler ready={audioReady} /> Audio Devices
                 </Typography.Text>
 
                 {errors && errors.length > 0 && (
                     <>
                         <Typography.Text>
-                            Don't worry about any errors below. We'll help you
-                            get these resolved soon!
+                            Don&apos;t worry about any errors below. We&apos;ll
+                            help you get these resolved soon!
                         </Typography.Text>
                         {errors.map((error) => (
                             <Typography.Text type="danger">
@@ -78,22 +78,22 @@ function HWCheck({ nextStep, previousStep }: Steppable) {
 
                 {/* Meanwhile, locate your AV Totes */}
                 <Typography.Title level={3}>
-                    Meanwhile, please locate your 2 AV Totes and 2 small camera
-                    pelicans. They are pictured below.
+                    Meanwhile, please locate your AV Tote and orange camera
+                    pelican. They are pictured below.
                 </Typography.Title>
 
                 <Row>
                     <Col span={12}>
                         <img
                             src={AVTotes}
-                            alt="2 Gray AV Totes"
+                            alt="Gray AV Tote"
                             style={{ width: '80%' }}
                         />
                     </Col>
                     <Col span={12}>
                         <img
                             src={CameraPelicans}
-                            alt="AV Pelicans"
+                            alt="Camera pelican"
                             style={{ width: '80%' }}
                         />
                     </Col>

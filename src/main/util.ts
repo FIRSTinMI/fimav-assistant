@@ -42,17 +42,15 @@ export const signalrToElectronLog = (
 ): void => {
     if (log === null) return;
     switch (logLevel) {
-    case LogLevel.Trace:
-        log.info(message);
-        break;
     case LogLevel.Debug:
-        log.info(message);
+    case LogLevel.Trace:
+        if (isDebug()) log.info(message);
         break;
     case LogLevel.Information:
         log.info(message);
-            break;
+        break;
     case LogLevel.Warning:
-            log.warn(message);
+        log.warn(message);
         break;
     case LogLevel.Error:
         log.error(message);
@@ -62,9 +60,13 @@ export const signalrToElectronLog = (
         break;
     case LogLevel.None:
         log.info(message);
-            break;
+        break;
+    default:
+        break;
     }
 };
+
+export const isDebug = () => process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 export const appdataPath = app.getPath('userData');
 export const logsPath = app.getPath('logs');
