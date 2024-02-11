@@ -45,7 +45,7 @@ export default function setupSignalR(
                 content: a.content,
             })),
         });
-        createAlertsWindowCallback();
+        if (newAlerts.length > 0) createAlertsWindowCallback();
     });
 
     signalRConnection

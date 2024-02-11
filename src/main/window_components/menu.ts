@@ -3,10 +3,14 @@ import {
     shell,
     BrowserWindow,
     MenuItemConstructorOptions,
+    app,
 } from 'electron';
 import Addons from 'main/addons';
 import { updateNow } from '../updates/update';
-import { logsPath } from '../util';
+import { isDebug, logsPath } from '../util';
+import createAlertsWindow, { getAlertsWindow } from './alertsWindow';
+import { platform } from 'os';
+import { quitApp } from '../main';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
     selector?: string;
@@ -38,7 +42,44 @@ export default class MenuBuilder {
 
     buildDefaultTemplate(dev: boolean) {
         const that = this;
-        const templateDefault: any = [
+        const templateDefault: MenuItemConstructorOptions[] = [];
+        
+        if (platform() === 'darwin') {
+            templateDefault.push({
+                label: 'FiM AV Assistant',
+                role: 'appMenu',
+                submenu: [
+                    {
+                        label: 'About FiM AV Assistant',
+                        role: 'about',
+                    },
+                    ...(dev ? [{
+                        label: 'Quit',
+                        click() {
+                            quitApp();
+                        }
+                    }] : [])
+                ],
+            });
+        }
+
+        templateDefault.push(...[
+            {
+                label: 'Alerts',
+                submenu: [
+                    {
+                        label: 'View Alerts',
+                        click() {
+                            const alertsWindow = getAlertsWindow();
+                            if (alertsWindow) {
+                                alertsWindow.show();
+                            } else {
+                                createAlertsWindow();
+                            }
+                        }
+                    }
+                ]
+            },
             {
                 label: 'Addons',
                 submenu: [
@@ -109,7 +150,7 @@ export default class MenuBuilder {
                     },
                 ],
             },
-        ];
+        ]);
 
         if (dev) {
             templateDefault.push({

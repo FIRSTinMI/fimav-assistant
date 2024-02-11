@@ -4,8 +4,8 @@ import { Steppable } from 'models/steppable';
 import { useEffect, useState } from 'react';
 import StepBar from 'renderer/components/StepBar';
 import ReadyHandler, { ReadyState } from 'renderer/components/ReadyHandler';
-import AVTotes from '../../../../assets/photos/av_totes.png';
-import CameraPelicans from '../../../../assets/photos/camera_pelicans.jpg';
+import AVTotes from '../../../../assets/photos/av_tote.jpg';
+import CameraPelicans from '../../../../assets/photos/camera_pelican.jpg';
 
 function HWCheck({ nextStep, previousStep }: Steppable) {
     const [networkReady, setNetworkReady] = useState(ReadyState.NotReady);
@@ -68,8 +68,8 @@ function HWCheck({ nextStep, previousStep }: Steppable) {
                             Don&apos;t worry about any errors below. We&apos;ll
                             help you get these resolved soon!
                         </Typography.Text>
-                        {errors.map((error) => (
-                            <Typography.Text type="danger">
+                        {errors.map((error, idx) => (
+                            <Typography.Text key={idx} type="danger">
                                 {error}
                             </Typography.Text>
                         ))}

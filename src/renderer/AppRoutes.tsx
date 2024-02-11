@@ -3,6 +3,7 @@ import HWCheck from './pages/hwcheck';
 import Welcome from './pages/welcome';
 import InternetSetup from './pages/internet_setup';
 import Alerts from './pages/alerts';
+import FallbackToDocs from './pages/fallbackToDocs';
 
 let Router: typeof HashRouter | typeof BrowserRouter;
 if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
@@ -26,6 +27,10 @@ function AppRoutes() {
                 <Route
                     path="/step/2"
                     element={<InternetSetup nextStep={3} previousStep={1} />}
+                />
+                <Route
+                    path="/step/3"
+                    element={<FallbackToDocs nextStep={0} previousStep={2} />}
                 />
             </Routes>
         </Router>

@@ -125,6 +125,12 @@ const createWindow = async () => {
     new AppUpdater();
 };
 
+export const quitApp = () => {
+    appIsQuitting = true;
+    addons.stop();
+    app.quit();
+}
+
 /**
  * Add event listeners...
  */
@@ -163,9 +169,7 @@ if (!instanceLock) {
             if (isDebug) {
                 // Ctrl + Q to quit
                 globalShortcut.register('CommandOrControl+Q', () => {
-                    appIsQuitting = true;
-                    addons.stop();
-                    app.quit();
+                    quitApp();
                 });
             }
 

@@ -112,8 +112,8 @@ StepBar.defaultProps = {
     showPrev: false,
     nextDisabled: false,
     prevDisabled: false,
-    beforeNext: () => {},
-    beforePrev: () => {}
+    beforeNext: undefined,
+    beforePrev: undefined
 } as Partial<IProps>;
 
 export default StepBar;

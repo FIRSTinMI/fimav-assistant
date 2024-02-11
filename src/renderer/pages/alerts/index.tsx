@@ -1,24 +1,31 @@
 import { LoadingOutlined } from '@ant-design/icons';
-import { Button, Space, Spin } from 'antd';
+import { Button, Empty, Space, Spin } from 'antd';
 import AlertsResponse from 'models/AlertsResponse';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 function Alerts() {
     const [alerts, setAlerts] = useState<AlertsResponse | null>(null);
+    const alertsRef = useRef<AlertsResponse | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    
+    useEffect(() => {
+        alertsRef.current = alerts;
+    }, [alerts]);
+
     useEffect(() => {
         if (!window.electron) return;
         window.electron.ipcRenderer.on(
             'alerts:alerts',
             (resp: AlertsResponse) => {
-                setAlerts(resp);
-                setIsLoading(false);
-                if (resp.alerts.length === 0) {
+                const previouslyHadAlerts = (alertsRef.current?.alerts.length ?? 0) >= 1;
+                if (resp.alerts.length === 0 && previouslyHadAlerts) {
                     window.electron.ipcRenderer.sendMessage(
                         'alerts:closeWindow',
                         []
                     );
                 }
+                setAlerts(resp);
+                setIsLoading(false);
             }
         );
         window.electron.ipcRenderer.sendMessage('alerts:getAlerts', []);
@@ -54,29 +61,34 @@ function Alerts() {
                     />
                 </div>
             )}
-            <Space direction="vertical" style={{ textAlign: 'left' }}>
-                {alerts &&
-                    alerts.alerts.map((alert) => (
-                        <div key={alert.id}>
-                            <div
-                                /* eslint-disable react/no-danger */
-                                dangerouslySetInnerHTML={{
-                                    __html: alert.content,
-                                }}
-                                /* eslint-enable react/no-danger */
-                            />
-                            <div style={{ textAlign: 'center' }}>
-                                <Button
-                                    type="text"
-                                    danger
-                                    onClick={() => dismissAlert(alert.id)}
-                                >
-                                    Dismiss
-                                </Button>
+            
+                {(alerts?.alerts.length ?? 0) === 0 && 
+                    <Space style={{ width: '100vw', marginTop: '1em' }} direction="vertical" align="center"><Empty description="No unread alerts" /></Space>
+                }
+                {alerts?.alerts &&
+                    <Space direction="vertical" style={{ textAlign: 'left' }}>
+                        {alerts.alerts.map((alert) => (
+                            <div key={alert.id}>
+                                <div
+                                    /* eslint-disable react/no-danger */
+                                    dangerouslySetInnerHTML={{
+                                        __html: alert.content,
+                                    }}
+                                    /* eslint-enable react/no-danger */
+                                />
+                                <div style={{ textAlign: 'center' }}>
+                                    <Button
+                                        type="text"
+                                        danger
+                                        onClick={() => dismissAlert(alert.id)}
+                                    >
+                                        Dismiss
+                                    </Button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
-            </Space>
+                        ))}
+                    </Space>
+                }
         </>
     );
 }
