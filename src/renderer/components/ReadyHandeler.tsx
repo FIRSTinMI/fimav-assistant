@@ -1,21 +1,20 @@
-import { CheckCircleOutlined, WarningOutlined } from "@ant-design/icons";
-import { Spin } from "antd";
-
+import { CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { Spin } from 'antd';
 
 export enum ReadyState {
     NotReady,
     Ready,
-    Error
+    Error,
 }
 
-const ReadyHandeler = ({ ready }: { ready: ReadyState }) => {
+function ReadyHandeler({ ready }: { ready: ReadyState }) {
     switch (ready) {
-        case ReadyState.NotReady:
-            return <Spin />;
-        case ReadyState.Ready:
-            return <CheckCircleOutlined />;
-        case ReadyState.Error:
-            return <WarningOutlined />;
+    case ReadyState.NotReady:
+        return <Spin />;
+    case ReadyState.Ready:
+        return <CheckCircleOutlined />;
+    case ReadyState.Error:
+        return <WarningOutlined />;
     }
 }
 

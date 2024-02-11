@@ -1,9 +1,13 @@
-import * as fs from "fs";
-import FMSMatchStatus from "../models/FMSMatchState";
-import path from "path";
+import * as fs from 'fs';
+import path from 'path';
+import FMSMatchStatus from '../models/FMSMatchState';
 
-
-export default async function attemptRename(eventName: string, videoLocation: string, recStartDate: Date, matchStatus: FMSMatchStatus): Promise<string> {
+export default async function attemptRename(
+    eventName: string,
+    videoLocation: string,
+    recStartDate: Date,
+    matchStatus: FMSMatchStatus
+): Promise<string> {
     return new Promise((resolve, reject) => {
         try {
             // VMix video location exists
@@ -23,7 +27,9 @@ export default async function attemptRename(eventName: string, videoLocation: st
             for (const file of files) {
                 const fileDate = vmixFilenameToDate(file);
                 if (fileDate !== null) {
-                    const diff = Math.abs(fileDate.getTime() - recStartDate.getTime());
+                    const diff = Math.abs(
+                        fileDate.getTime() - recStartDate.getTime()
+                    );
                     if (diff < 5000) {
                         closestFile = file;
                         closestFileDate = fileDate;
@@ -39,7 +45,8 @@ export default async function attemptRename(eventName: string, videoLocation: st
             }
 
             // Build the file name
-            const playString = matchStatus.p2 > 1 ? ` (Play #${matchStatus.p2})` : '';
+            const playString =
+                matchStatus.p2 > 1 ? ` (Play #${matchStatus.p2})` : '';
             const newFileName = `${eventName} - ${matchStatus.p4} Match ${matchStatus.p2}${playString}.mp4`;
 
             // Check if event name folder exists
@@ -49,7 +56,10 @@ export default async function attemptRename(eventName: string, videoLocation: st
             }
 
             // Rename and move the file
-            fs.renameSync(path.resolve(videoLocation, closestFile), path.resolve(eventFolder, newFileName));
+            fs.renameSync(
+                path.resolve(videoLocation, closestFile),
+                path.resolve(eventFolder, newFileName)
+            );
 
             // Resolve
             resolve(path.resolve(eventFolder, newFileName));
@@ -60,13 +70,15 @@ export default async function attemptRename(eventName: string, videoLocation: st
 }
 
 // Matches the filename and grabs each part in the order that it occurs in the file name
-const fileNameRegex = /.* - (\d*) ([a-zA-Z]*) (\d*) - (\d*)-(\d*)-(\d*) ([a-zA-Z]*).*/;
+const fileNameRegex =
+    /.* - (\d*) ([a-zA-Z]*) (\d*) - (\d*)-(\d*)-(\d*) ([a-zA-Z]*).*/;
 
 function vmixFilenameToDate(filename: string): Date | null {
     // Vmix file name example: "capture - 23 September 2023 - 08-35-04 AM.mp4"
     // Regex makes it this:
     // ['capture - 23 September 2023 - 08-35-04 AM.mp4', '23', 'September', '2023', '08', '35', '04', 'AM']
-    const [full, day, month, year, hour, minute, second, ampm] = fileNameRegex.exec(filename) ?? [];
+    const [full, day, month, year, hour, minute, second, ampm] =
+        fileNameRegex.exec(filename) ?? [];
     if (full === undefined) {
         return null;
     }
@@ -81,5 +93,4 @@ function vmixFilenameToDate(filename: string): Date | null {
     date.setSeconds(parseInt(second));
     date.setMilliseconds(0);
     return date;
-
 }

@@ -1,14 +1,14 @@
-import { logsPath } from "../util";
-import LiveCaptions from './live-captions'
-import fs from "fs";
-import path from "path";
-import glob from "glob";
-import AutoAV from "./autoav";
-import log, { LogFunctions } from "electron-log";
+import fs from 'fs';
+import path from 'path';
+import glob from 'glob';
+import log, { LogFunctions } from 'electron-log';
+import AutoAV from './autoav';
+import LiveCaptions from './live-captions';
+import { logsPath } from '../util';
 
 export default class Addons {
-
     private liveCaptions: LiveCaptions = LiveCaptions.Instance;
+
     private AutoAV: AutoAV = AutoAV.Instance;
 
     public init(): Addons {
@@ -42,7 +42,7 @@ export default class Addons {
 
     // Restart all
     public restartAll() {
-        log.info("📦 Addons Starting...");
+        log.info('📦 Addons Starting...');
 
         // Stop autoav
         this.AutoAV.stop();
@@ -91,7 +91,7 @@ export default class Addons {
         });
 
         // Move the current logs to a timestamped folder
-        const folderName = Date.now().toString()
+        const folderName = Date.now().toString();
         fs.mkdirSync(path.join(logsPath, folderName));
 
         // Find all *.log files in the logs directory
@@ -105,6 +105,6 @@ export default class Addons {
 }
 
 export type AddonLoggers = {
-    out: LogFunctions,
-    err: LogFunctions
-}
+    out: LogFunctions;
+    err: LogFunctions;
+};

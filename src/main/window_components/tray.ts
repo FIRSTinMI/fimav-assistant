@@ -1,8 +1,11 @@
-import { Menu, Tray } from "electron";
-import path from "path";
+import { Menu, Tray } from 'electron';
+import path from 'path';
 
-
-export default function buildTray(mainWindow: Electron.BrowserWindow | null, RESOURCES_PATH: string, version: string) {
+export default function buildTray(
+    mainWindow: Electron.BrowserWindow | null,
+    RESOURCES_PATH: string,
+    version: string
+) {
     const tray = new Tray(path.join(RESOURCES_PATH, 'icon.png'));
     const contextMenu = Menu.buildFromTemplate([
         {

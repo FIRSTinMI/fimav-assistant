@@ -1,21 +1,22 @@
 import { HubConnection, HubConnectionBuilder } from '@microsoft/signalr';
 import nodeFetch from 'node-fetch';
+import log from 'electron-log';
 import VmixRecordingService from '../../services/VmixRecordingService';
 import FMSMatchStatus from '../../models/FMSMatchState';
 import attemptRename from '../../utils/recording';
-import log from 'electron-log';
 import { AddonLoggers } from '.';
 import { signalrToElectronLog } from '../util';
 
-
 export default class AutoAV {
-
     private static _instance: AutoAV;
 
     // Last Match "Start"
     private lastMatchStartTime: Date | null = null;
+
     private lastMatchStartData: FMSMatchStatus | null = null;
+
     private lastState: FMSMatchStatus | null = null;
+
     private hubConnection: HubConnection | null = null;
 
     private logs: AddonLoggers | null = null;
@@ -23,11 +24,10 @@ export default class AutoAV {
     constructor() {
         // Start new log files
         this.logs = {
-            out: log.scope("autoav.out"),
-            err: log.scope("autoav.err")
+            out: log.scope('autoav.out'),
+            err: log.scope('autoav.err'),
         };
     }
-
 
     // Start AutoAV
     public start() {
@@ -46,31 +46,47 @@ export default class AutoAV {
             .withUrl('http://10.0.100.5:8189/infrastructureHub')
             .configureLogging({
                 log: (logLevel, message) => {
-                    signalrToElectronLog(this.logs?.out ?? null, logLevel, message)
+                    signalrToElectronLog(
+                        this.logs?.out ?? null,
+                        logLevel,
+                        message
+                    );
                 },
             })
             .withAutomaticReconnect()
             .build();
 
         // Register listener for the "MatchStatusInfoChanged" event (match starts, ends, changes modes, etc)
-        this.hubConnection.on('MatchStatusInfoChanged', (info: FMSMatchStatus) => {
-            // Log the change
-            this.log(`Match Status Changed: ${this.lastState ? this.lastState.p1 : 'Unknown'} -> ${info.p1} for ${info.p4} Match ${info.p2} (Play #${info.p3})`);
+        this.hubConnection.on(
+            'MatchStatusInfoChanged',
+            (info: FMSMatchStatus) => {
+                // Log the change
+                this.log(
+                    `Match Status Changed: ${
+                        this.lastState ? this.lastState.p1 : 'Unknown'
+                    } -> ${info.p1} for ${info.p4} Match ${info.p2} (Play #${
+                        info.p3
+                    })`
+                );
 
-            // Update
-            this.lastState = info;
+                // Update
+                this.lastState = info;
 
-            // Start recording when GameSpecificData is released (match starts)
-            if (info.p1 === 'GameSpecificData') {
-                vmixService.StartRecording().then(() => {
-                    this.log('🔴 Started Recording');
-                    this.lastMatchStartData = info;
-                    this.lastMatchStartTime = new Date();
-                }).catch((err) => {
-                    this.log(`‼️ Error Starting Recording: ${err}`);
-                });
+                // Start recording when GameSpecificData is released (match starts)
+                if (info.p1 === 'GameSpecificData') {
+                    vmixService
+                        .StartRecording()
+                        .then(() => {
+                            this.log('🔴 Started Recording');
+                            this.lastMatchStartData = info;
+                            this.lastMatchStartTime = new Date();
+                        })
+                        .catch((err) => {
+                            this.log(`‼️ Error Starting Recording: ${err}`);
+                        });
+                }
             }
-        });
+        );
 
         // Register listener for the "SystemConfigValueChanged" event (video switch))
         this.hubConnection.on('SystemConfigValueChanged', async (configKey) => {
@@ -92,30 +108,50 @@ export default class AutoAV {
 
                     // TODO: Make this time dynamic and configurable
                     setTimeout(() => {
-                        vmixService.StopRecording().then(async () => {
-                            this.log('🟥 Stopped Recording');
+                        vmixService
+                            .StopRecording()
+                            .then(async () => {
+                                this.log('🟥 Stopped Recording');
 
-                            // If we don't have a start time or data, don't try to rename
-                            if (!this.lastMatchStartTime || !this.lastMatchStartData) return;
+                                // If we don't have a start time or data, don't try to rename
+                                if (
+                                    !this.lastMatchStartTime ||
+                                    !this.lastMatchStartData
+                                )
+                                    return;
 
-                            // Start trying to rename file // TODO: Make dynamic and configurable
-                            const recordingLocation = "C:\\Users\\FIM\\Documents\\vMixStorage";
+                                // Start trying to rename file // TODO: Make dynamic and configurable
+                                const recordingLocation =
+                                    'C:\\Users\\FIM\\Documents\\vMixStorage';
 
-                            // Attempt to rename the file
-                            await attemptRename("eventName", recordingLocation, this.lastMatchStartTime, this.lastMatchStartData).then(filename => {
-                                // Log the new filename
-                                this.log(`Renamed last recording to ${filename}`);
-                            }).catch(err => {
-                                // Log the error
-                                this.log(`‼️ Error Renaming Recording: ${err}`);
-                            }).finally(() => {
-                                // Reset the last match start time and data
-                                this.lastMatchStartTime = null;
-                                this.lastMatchStartData = null;
+                                // Attempt to rename the file
+                                await attemptRename(
+                                    'eventName',
+                                    recordingLocation,
+                                    this.lastMatchStartTime,
+                                    this.lastMatchStartData
+                                )
+                                    .then((filename) => {
+                                        // Log the new filename
+                                        this.log(
+                                            `Renamed last recording to ${filename}`
+                                        );
+                                    })
+                                    .catch((err) => {
+                                        // Log the error
+                                        this.log(
+                                            `‼️ Error Renaming Recording: ${err}`
+                                        );
+                                    })
+                                    .finally(() => {
+                                        // Reset the last match start time and data
+                                        this.lastMatchStartTime = null;
+                                        this.lastMatchStartData = null;
+                                    });
+                            })
+                            .catch((err) => {
+                                this.log(`‼️ Error Stopping Recording: ${err}`);
                             });
-                        }).catch((err) => {
-                            this.log(`‼️ Error Stopping Recording: ${err}`);
-                        });
                     }, 10000);
                 }
             }
@@ -132,11 +168,14 @@ export default class AutoAV {
         });
 
         // Start connection to SignalR Hub
-        this.hubConnection.start().then(() => {
-            this.log('AutoAV FMS Connection Established!');
-        }).catch((err) => {
-            this.log(`AutoAV FMS Connection Failed: ${err}`);
-        });
+        this.hubConnection
+            .start()
+            .then(() => {
+                this.log('AutoAV FMS Connection Established!');
+            })
+            .catch((err) => {
+                this.log(`AutoAV FMS Connection Failed: ${err}`);
+            });
     }
 
     // Stop AutoAV
