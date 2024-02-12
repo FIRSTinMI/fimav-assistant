@@ -1,42 +1,54 @@
-/* eslint global-require: off, no-console: off, promise/always-return: off */
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import log from 'electron-log';
-import MenuBuilder from './window_components/menu';
-import { RESOURCES_PATH, getAssetPath, resolveHtmlPath } from './util';
-import { registerAllEvents } from './register-events';
-import { createStore } from './store';
+import MenuBuilder from './window_components/menu'; // eslint-disable-line import/no-cycle
+import {
+    RESOURCES_PATH,
+    getAssetPath,
+    logsPath,
+    resolveHtmlPath,
+    isDebug as isDebugFn
+} from './util';
+import registerAllEvents from './register-events';
+import { getStore } from './store';
 import setupSignalR from './window_components/signalR';
 import buildTray from './window_components/tray';
-import { startAutoUpdate } from './updates/update'
+import { startAutoUpdate } from './updates/update';
 import createAlertsWindow from './window_components/alertsWindow';
 import Addons from './addons';
 
-class AppUpdater {
+log.transports.file.resolvePath = (variables, message) => {
+    const scope =
+        typeof message?.scope === 'string'
+            ? message.scope
+            : message?.scope?.label;
+    let fileName = scope ?? variables.fileName ?? 'main';
+    if (!fileName.endsWith('.log')) fileName += '.log';
+    return path.join(logsPath, fileName);
+};
 
-  constructor() {
-    log.transports.file.level = 'info';
-  }
+class AppUpdater {
+    constructor() {
+        log.transports.file.level = 'info';
+    }
 }
 
 let mainWindow: BrowserWindow | null = null;
 let appIsQuitting = false;
+const isDebug = isDebugFn();
 
 // Addons
 const addons = new Addons().init();
 
 // Register all the event handlers
-registerAllEvents(ipcMain, addons);
+registerAllEvents(ipcMain);
 
 if (process.env.NODE_ENV === 'production') {
-  const sourceMapSupport = require('source-map-support');
-  sourceMapSupport.install();
-  // setup auto update
-  startAutoUpdate();
+    const sourceMapSupport = require('source-map-support');
+    sourceMapSupport.install();
+    // setup auto update
+    startAutoUpdate();
 }
-
-const isDebug =
-    process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 
 if (isDebug) {
     require('electron-debug')({ showDevTools: false });
@@ -57,7 +69,7 @@ const installExtensions = async () => {
 
 /** Create the main window */
 const createWindow = async () => {
-    if (true || isDebug) {
+    if (isDebug) {
         await installExtensions();
     }
 
@@ -113,6 +125,13 @@ const createWindow = async () => {
     new AppUpdater();
 };
 
+// eslint-disable-next-line import/prefer-default-export
+export const quitApp = () => {
+    appIsQuitting = true;
+    addons.stop();
+    app.quit();
+}
+
 /**
  * Add event listeners...
  */
@@ -123,44 +142,53 @@ app.on('window-all-closed', () => {
 const instanceLock = app.requestSingleInstanceLock();
 if (!instanceLock) {
     // This is a second instance, we only want one at a time
+    if (isDebug)
+        log.error(
+            'Tried to open another instance while the old one was still open. New changes will not be reflected.'
+        );
     app.quit();
 } else {
-    app.on('second-instance', (evt) => {
+    app.on('second-instance', () => {
+        if (isDebug)
+            log.error(
+                'Tried to open another instance while the old one was still open. New changes will not be reflected.'
+            );
         if (mainWindow) {
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
+        } else {
+            createWindow();
         }
     });
 
-    app
-    .whenReady()
-    .then(() => {
-        createWindow();
-        const store = createStore();
+    app.whenReady()
+        .then(() => {
+            createWindow();
+            const store = getStore();
 
-        // Register Shortcuts
-        if (!app.isPackaged) {
-            // Ctrl + Q to quit
-            globalShortcut.register('CommandOrControl+Q', () => {
-                appIsQuitting = true;
-                addons.stop();
-                app.quit();
+            // Register Shortcuts
+            if (isDebug) {
+                // Ctrl + Q to quit
+                globalShortcut.register('CommandOrControl+Q', () => {
+                    quitApp();
+                });
+            }
+
+            // Register Tray Icon
+            buildTray(mainWindow, RESOURCES_PATH, app.getVersion());
+
+            // TODO: Currently the API key is set manually by opening the config.json file
+            if (store.get('apiKey')) {
+                setupSignalR(store, createAlertsWindow);
+            }
+
+            app.on('activate', () => {
+                // On macOS it's common to re-create a window in the app when the
+                // dock icon is clicked and there are no other windows open.
+                if (mainWindow === null) createWindow();
             });
-        }
 
-        // Register Tray Icon
-        buildTray(mainWindow, RESOURCES_PATH, app.getVersion());
-
-        // TODO: Currently the API key is set manually by opening the config.json file
-        if (store.get('apiKey')) {
-            setupSignalR(store, createAlertsWindow);
-        }
-
-        app.on('activate', () => {
-            // On macOS it's common to re-create a window in the app when the
-            // dock icon is clicked and there are no other windows open.
-            if (mainWindow === null) createWindow();
-        });
-    })
-    .catch(log.error);
+            return undefined;
+        })
+        .catch(log.error);
 }

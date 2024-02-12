@@ -1,28 +1,44 @@
-import path from "path";
-import fs from "fs";
+import path from 'path';
+import fs from 'fs';
 import { finished } from 'stream/promises';
 import { ChildProcessWithoutNullStreams, spawn, execSync } from 'child_process';
 import glob from 'glob';
-import { Readable } from "node:stream";
-import { app } from "electron";
-import { appdataPath } from "../util";
+import log from 'electron-log';
+import { Readable } from 'node:stream';
+import { appdataPath } from '../util';
+import { AddonLoggers } from './addon-loggers';
+import { getStore } from '../store';
 
 export default class LiveCaptions {
+    private static instance: LiveCaptions;
 
-    private static _instance: LiveCaptions;
     private running = false;
+
     private process: ChildProcessWithoutNullStreams | null = null;
+
+    private logs: AddonLoggers;
+
+    constructor() {
+        this.logs = {
+            out: log.scope('live-captions.out'),
+            err: log.scope('live-captions.err'),
+        };
+    }
 
     // Kill any existing live-captions processes
     private killExisting() {
         try {
             // Find any exiting live-captions processes and kill them
-            const out = execSync('wmic process get processid,name | find "live-captions"').toString() // outputs "<process name>                    <pid>"
+            const out = execSync(
+                'wmic process get processid,name | find "live-captions"'
+            ).toString(); // outputs "<process name>                    <pid>"
             const lines = out.split('\n');
             if (lines.length > 1) {
-                const split = lines[0].trim().split(' ')
+                const split = lines[0].trim().split(' ');
                 const pid = split[split.length - 1];
-                console.log(`Found existing live-captions process (PID ${pid}), killing it`);
+                this.logs.out.log(
+                    `Found existing live-captions process (PID ${pid}), killing it`
+                );
                 execSync(`taskkill /pid ${pid} /f /t`);
             }
             this.running = false;
@@ -33,8 +49,8 @@ export default class LiveCaptions {
     }
 
     /*
-    * Starts the live-captions process
-    */
+     * Starts the live-captions process
+     */
     public async start(): Promise<boolean> {
         this.killExisting();
 
@@ -45,30 +61,39 @@ export default class LiveCaptions {
         // Current version of live-captions
         let currentVersion = '0.0.0';
         found.forEach((file) => {
-            const version = file.split('-').pop()?.split('.exe')[0] ?? "0.0.0";
+            const version = file.split('-').pop()?.split('.exe')[0] ?? '0.0.0';
             if (version > currentVersion) {
                 currentVersion = version;
             }
         });
 
+        const baseUrl = getStore().get('liveCaptionsDownloadBase');
+
         // If it doesn't exist, download it from Github
-        const res = await fetch('https://github.com/Filip-Kin/live-captions/releases/latest')
+        const res = await fetch(`${baseUrl}/latest`);
 
         // Fetching "/latest" from github forwards to the latest release URL, which we can then extract the version from the response URL.
         const latestVersion = res.url.split('/').pop()?.slice(1) || '0.0.0';
 
         // If the latest version is greater than the current version, download the latest version
         if (latestVersion > currentVersion) {
-            console.log(`Found new version of live-captions, currently at ${currentVersion}, downloading ${latestVersion}`);
+            this.logs.out.log(
+                `Found new version of live-captions, currently at ${currentVersion}, downloading ${latestVersion}`
+            );
 
             // Create write stream
-            const stream = fs.createWriteStream(path.join(appdataPath, `live-captions-${latestVersion}.exe`));
+            const stream = fs.createWriteStream(
+                path.join(appdataPath, `live-captions-${latestVersion}.exe`)
+            );
 
             // Download the live-captions executable
-            const { body } = await fetch(`https://github.com/Filip-Kin/live-captions/releases/download/v${latestVersion}/live-captions-${latestVersion}.exe`);
+            const { body } = await fetch(
+                `${baseUrl}/download/v${latestVersion}/live-captions-${latestVersion}.exe`
+            );
 
             // Check if the download was successful
-            if (body === null) throw new Error('Failed to download live-captions');
+            if (body === null)
+                throw new Error('Failed to download live-captions');
 
             // @ts-ignore
             await finished(Readable.fromWeb(body).pipe(stream));
@@ -77,16 +102,17 @@ export default class LiveCaptions {
             currentVersion = latestVersion;
         }
 
-        console.log(`Starting live-captions v${currentVersion}`)
+        this.logs.out.log(`Starting live-captions v${currentVersion}`);
 
         // Start the live-captions process
-        return this.startLiveCaptions(path.join(appdataPath, `live-captions-${currentVersion}.exe`));
-
+        return this.startLiveCaptions(
+            path.join(appdataPath, `live-captions-${currentVersion}.exe`)
+        );
     }
 
     // Stop the live-captions process
     public stop(): Promise<boolean> {
-        return new Promise<boolean>((resolve, reject) => {
+        return new Promise<boolean>((resolve) => {
             if (!this.running || !this.process || this.process.killed) {
                 resolve(true);
                 return;
@@ -108,7 +134,7 @@ export default class LiveCaptions {
 
     // Run the live-captions process from a path
     private startLiveCaptions(exePath: string): Promise<boolean> {
-        return new Promise<boolean>((resolve, reject) => {
+        return new Promise<boolean>((resolve) => {
             if (this.running || (this.process && !this.process.killed)) {
                 resolve(true);
                 return;
@@ -118,19 +144,24 @@ export default class LiveCaptions {
             this.process = spawn(exePath, [], { shell: true });
 
             // Log the stdout and stderr to files
-            this.process.stdout.pipe(fs.createWriteStream(path.join(appdataPath, 'logs', 'live-captions.out.log')));
-            this.process.stderr.pipe(fs.createWriteStream(path.join(appdataPath, 'logs', 'live-captions.err.log')));
+            this.process.stdout.on('data', (data) => {
+                this.logs.out.info(data);
+            });
+            this.process.stdout.on('data', (data) => {
+                this.logs.err.error(data);
+            });
 
             this.process.on('exit', this.onExit.bind(this));
         });
     }
 
     private onExit(err: any) {
-        console.log('Live-captions exited with code', err.code);
+        this.logs.out.log('Live-captions exited with code', err.code);
         this.running = false;
     }
 
     public static get Instance(): LiveCaptions {
-        return this._instance || (this._instance = new this());
+        if (!this.instance) this.instance = new this();
+        return this.instance;
     }
 }

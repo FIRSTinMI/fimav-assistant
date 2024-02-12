@@ -1,21 +1,28 @@
-import { LeftOutlined, RightOutlined } from "@ant-design/icons"
-import { Button, Col, Row, Space } from "antd"
-import { Steppable } from "models/steppable"
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-
+import { LeftOutlined, RightOutlined } from '@ant-design/icons';
+import { Button, Col, Row } from 'antd';
+import { Steppable } from 'models/steppable';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface IProps extends Steppable {
-    showNext?: boolean
-    showPrev?: boolean
-    nextDisabled?: boolean
-    prevDisabled?: boolean
-    beforeNext?: () => Promise<boolean> // Things to execute before next step.  Returning true will advance, false will not
-    beforePrev?: () => Promise<boolean> // Things to execute before previous step.  Returning true will go back, false will not
+    showNext?: boolean;
+    showPrev?: boolean;
+    nextDisabled?: boolean;
+    prevDisabled?: boolean;
+    beforeNext?: () => Promise<boolean>; // Things to execute before next step.  Returning true will advance, false will not
+    beforePrev?: () => Promise<boolean>; // Things to execute before previous step.  Returning true will go back, false will not
 }
 
-const StepBar = ({ nextStep, previousStep, showNext, showPrev, beforeNext, beforePrev, nextDisabled, prevDisabled }: IProps) => {
-
+function StepBar({
+    nextStep,
+    previousStep,
+    showNext,
+    showPrev,
+    beforeNext,
+    beforePrev,
+    nextDisabled,
+    prevDisabled,
+}: IProps) {
     const nav = useNavigate();
     const [loading, setLoading] = useState<boolean>(false);
 
@@ -31,7 +38,7 @@ const StepBar = ({ nextStep, previousStep, showNext, showPrev, beforeNext, befor
         } else {
             nav(`/step/${nextStep}`);
         }
-    }
+    };
 
     const handlePrevious = async () => {
         if (beforePrev) {
@@ -45,51 +52,68 @@ const StepBar = ({ nextStep, previousStep, showNext, showPrev, beforeNext, befor
         } else {
             navBack();
         }
-    }
+    };
 
     const navBack = () => {
         if (previousStep < 1) {
-            nav("/");
+            nav('/');
         } else {
             nav(`/step/${previousStep}`);
         }
-    }
+    };
 
     return (
-        <Row gutter={2} style={{ position: "fixed", bottom: "43px", left: 0, width: '100%', paddingLeft: "10px" }}>
+        <Row
+            gutter={2}
+            style={{
+                position: 'fixed',
+                bottom: '43px',
+                left: 0,
+                width: '100%',
+                paddingLeft: '10px',
+            }}
+        >
             <Col span={8}>
-                {showPrev &&
+                {showPrev && (
                     <Button
                         type="primary"
                         danger
                         loading={loading}
-                        size={"large"}
+                        size="large"
                         onClick={handlePrevious}
                         disabled={prevDisabled}
                         icon={<LeftOutlined />}
                     >
                         Previous
                     </Button>
-                }
+                )}
             </Col>
-            <Col span={8} offset={8} style={{display: "flex"}}>
-                {showNext &&
+            <Col span={8} offset={8} style={{ display: 'flex' }}>
+                {showNext && (
                     <Button
                         type="primary"
                         loading={loading}
-                        size={"large"}
+                        size="large"
                         onClick={handleNext}
                         disabled={nextDisabled}
-                        style={{ marginLeft: "auto", marginRight: "5px" }}
+                        style={{ marginLeft: 'auto', marginRight: '5px' }}
                     >
                         Next
                         <RightOutlined />
                     </Button>
-                }
+                )}
             </Col>
         </Row>
-    )
-
+    );
 }
+
+StepBar.defaultProps = {
+    showNext: false,
+    showPrev: false,
+    nextDisabled: false,
+    prevDisabled: false,
+    beforeNext: undefined,
+    beforePrev: undefined
+} as Partial<IProps>;
 
 export default StepBar;

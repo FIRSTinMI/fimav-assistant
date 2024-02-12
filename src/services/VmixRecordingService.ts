@@ -1,5 +1,3 @@
-import nodeFetch from 'node-fetch';
-
 type VmixSettings = {
     baseUrl: string;
     username: string;
