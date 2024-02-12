@@ -3,14 +3,13 @@ import {
     shell,
     BrowserWindow,
     MenuItemConstructorOptions,
-    app,
 } from 'electron';
 import Addons from 'main/addons';
+import { platform } from 'os';
 import { updateNow } from '../updates/update';
 import { isDebug, logsPath } from '../util';
 import createAlertsWindow, { getAlertsWindow } from './alertsWindow';
-import { platform } from 'os';
-import { quitApp } from '../main';
+import { quitApp } from '../main'; // eslint-disable-line import/no-cycle
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
     selector?: string;
@@ -28,11 +27,7 @@ export default class MenuBuilder {
     }
 
     buildMenu(): Menu {
-        const isDev =
-            process.env.NODE_ENV === 'development' ||
-            process.env.DEBUG_PROD === 'true';
-
-        const template = this.buildDefaultTemplate(isDev);
+        const template = this.buildDefaultTemplate(isDebug());
 
         const menu = Menu.buildFromTemplate(template);
         Menu.setApplicationMenu(menu);

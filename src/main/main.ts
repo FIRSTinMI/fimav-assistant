@@ -1,7 +1,7 @@
 import path from 'path';
 import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
 import log from 'electron-log';
-import MenuBuilder from './window_components/menu';
+import MenuBuilder from './window_components/menu'; // eslint-disable-line import/no-cycle
 import {
     RESOURCES_PATH,
     getAssetPath,
@@ -125,6 +125,7 @@ const createWindow = async () => {
     new AppUpdater();
 };
 
+// eslint-disable-next-line import/prefer-default-export
 export const quitApp = () => {
     appIsQuitting = true;
     addons.stop();

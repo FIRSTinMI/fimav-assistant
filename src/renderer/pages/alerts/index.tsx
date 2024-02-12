@@ -61,34 +61,34 @@ function Alerts() {
                     />
                 </div>
             )}
-            
-                {(alerts?.alerts.length ?? 0) === 0 && 
-                    <Space style={{ width: '100vw', marginTop: '1em' }} direction="vertical" align="center"><Empty description="No unread alerts" /></Space>
-                }
-                {alerts?.alerts &&
-                    <Space direction="vertical" style={{ textAlign: 'left' }}>
-                        {alerts.alerts.map((alert) => (
-                            <div key={alert.id}>
-                                <div
-                                    /* eslint-disable react/no-danger */
-                                    dangerouslySetInnerHTML={{
-                                        __html: alert.content,
-                                    }}
-                                    /* eslint-enable react/no-danger */
-                                />
-                                <div style={{ textAlign: 'center' }}>
-                                    <Button
-                                        type="text"
-                                        danger
-                                        onClick={() => dismissAlert(alert.id)}
-                                    >
-                                        Dismiss
-                                    </Button>
-                                </div>
+
+            {(alerts?.alerts.length ?? 0) === 0 && 
+                <Space style={{ width: '100vw', marginTop: '1em' }} direction="vertical" align="center"><Empty description="No unread alerts" /></Space>
+            }
+            {alerts?.alerts &&
+                <Space direction="vertical" style={{ textAlign: 'left' }}>
+                    {alerts.alerts.map((alert) => (
+                        <div key={alert.id}>
+                            <div
+                                /* eslint-disable react/no-danger */
+                                dangerouslySetInnerHTML={{
+                                    __html: alert.content,
+                                }}
+                                /* eslint-enable react/no-danger */
+                            />
+                            <div style={{ textAlign: 'center' }}>
+                                <Button
+                                    type="text"
+                                    danger
+                                    onClick={() => dismissAlert(alert.id)}
+                                >
+                                    Dismiss
+                                </Button>
                             </div>
-                        ))}
-                    </Space>
-                }
+                        </div>
+                    ))}
+                </Space>
+            }
         </>
     );
 }

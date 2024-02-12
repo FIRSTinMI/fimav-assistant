@@ -68,8 +68,8 @@ function HWCheck({ nextStep, previousStep }: Steppable) {
                             Don&apos;t worry about any errors below. We&apos;ll
                             help you get these resolved soon!
                         </Typography.Text>
-                        {errors.map((error, idx) => (
-                            <Typography.Text key={idx} type="danger">
+                        {errors.map((error) => (
+                            <Typography.Text key={error} type="danger">
                                 {error}
                             </Typography.Text>
                         ))}
