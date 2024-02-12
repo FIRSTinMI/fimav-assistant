@@ -17,6 +17,8 @@ jobs:
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v3
       - name: root package.json version bump?
         uses: del-systems/check-if-version-bumped@v1.3
         with:
