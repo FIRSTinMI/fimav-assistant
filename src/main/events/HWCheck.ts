@@ -1,5 +1,7 @@
-import { spawn } from 'child_process';
+import { exec, spawn } from 'child_process';
 import electronLog, { LogFunctions } from 'electron-log';
+import { writeFileSync } from 'fs';
+import { NetAdapterModel } from 'models/AdvancedAdapterInfo';
 import HWCheckResponse from 'models/HWCheckResponse';
 import SoundVolumeViewOutput from 'models/SoundVolumeViewOutput';
 import { networkInterfaces, hostname, NetworkInterfaceInfo } from 'os';
@@ -54,10 +56,10 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     }
 
     // Get Computer Name
-    const whoAmI = hostname();
+    const whoAmI = hostname().toLowerCase();
 
     // AV Carts are maned FIMAV<number>, so lets determine which cart we are
-    let cartNumber = parseInt(whoAmI.replace('fimvideo', ''), 10);
+    let cartNumber = parseInt(whoAmI.replace(/\D/g, ''), 10);
 
     // If NaN, we are not an AV Cart
     const isAVCart = !Number.isNaN(cartNumber);
@@ -67,47 +69,60 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
 
     // Get Network Interfaces
     const interfaces = networkInterfaces();
+    const advancedInterfaces = await advancedNetworkInterfaces();
     let vlan10: NetworkInterfaceInfo[] | undefined;
+    let vlan10Name: string | undefined;
     let vlan20: NetworkInterfaceInfo[] | undefined;
+    let vlan20Name: string | undefined;
     let vlan30: NetworkInterfaceInfo[] | undefined;
-    let primaryNic: NetworkInterfaceInfo[] | undefined; // eslint-disable-line no-unused-vars
+    let vlan30Name: string | undefined;
+    let primaryNic: NetworkInterfaceInfo[] | undefined;
+    let primaryName: string | undefined;
     let secondaryNic: NetworkInterfaceInfo[] | undefined;
-    let foundCount = 0;
+    let secondaryName: string | undefined;
 
     // Send nics to response
     resp.nics_found = Object.keys(interfaces);
 
     // Find important interfaces
-    Object.keys(interfaces).forEach((key) => {
-        if (key === 'Ethernet') {
+    Object.keys(interfaces).forEach(key => {
+        const compare = key.toLowerCase()
+        if (compare === "ethernet") {
             primaryNic = interfaces[key];
-            foundCount += 1;
-        } else if (key === 'Ethernet 2') {
+            primaryName = key;
+        } else if (compare === "ethernet 2") {
             secondaryNic = interfaces[key];
-            foundCount += 1;
-        } else if (key.toLowerCase().indexOf('vlan') > -1) {
-            if (key.indexOf('10') > -1) {
+            secondaryName = key;
+        }
+
+        // See if we have advanced info on this NIC
+        if (advancedInterfaces[key]) {
+            if (advancedInterfaces[key].VLAN_ID === '10') {
                 vlan10 = interfaces[key];
-                foundCount += 1;
-            } else if (key.indexOf('20') > -1) {
+                vlan10Name = key;
+            } else if (advancedInterfaces[key].VLAN_ID === '20') {
                 vlan20 = interfaces[key];
-                foundCount += 1;
-            } else if (key.indexOf('30') > -1) {
+                vlan20Name = key;
+            } else if (advancedInterfaces[key].VLAN_ID === '30') {
                 vlan30 = interfaces[key];
-                foundCount += 1;
+                vlan30Name = key;
             }
         }
     });
 
+    // Valid collections of NICs
+    const allExist = vlan10 && vlan20 && vlan30;;
+    const altConfig = vlan10 && secondaryName && vlan30;
+
     // Check that we found all the required NICs
-    if (foundCount < 5)
+    if (!allExist && !altConfig)
         resp.errors.push(
             'Could not find all required network interfaces. Please contact FIMAV Support'
         );
 
-    // Enable DHCP on field and venue NICs
-    if (vlan10)
-        await enableDhcp('Ethernet')
+    // Enable DHCP on venue NIC
+    if (vlan10 && vlan10Name)
+        await enableDhcp(vlan10Name)
             .then(() => {
                 resp.logs.push('Enabled DHCP on Venue VLAN');
                 return undefined;
@@ -117,8 +132,9 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
                 resp.errors.push('Failed to enable DHCP on Venue VLAN');
             });
 
-    if (vlan20)
-        await enableDhcp('Ethernet 2')
+    // Enable DHCP on field NIC
+    if (vlan20 && vlan20Name)
+        await enableDhcp(vlan20Name)
             .then(() => {
                 resp.logs.push('Enabled DHCP on Field VLAN');
                 return undefined;
@@ -129,29 +145,31 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
             });
 
     // Check that AV Vlan has a static IP of 192.168.25.<cart_number>0
-    const avIp = vlan30?.find((i) => i.family === 'IPv4')?.address;
-    resp.av_ip_ready = avIp === `192.168.25.${cartNumber}0`;
-    if (!resp.av_ip_ready) {
-        // Call netsh to set the IP
-        await setStaticIp(
-            'Ethernet',
-            `192.168.25.${cartNumber}0`,
-            '255.255.255.0',
-            ''
-        )
-            .then(() => {
-                resp.logs.push(
-                    `Set AV VLAN IP was incorrectly set to ${avIp}.  Set static to 192.168.25.${cartNumber}0`
-                );
-                resp.av_ip_ready = true;
-                return undefined;
-            })
-            .catch((err) => {
-                log.error('Could not set AV VLAN IP: ', err);
-                resp.errors.push(
-                    `AV VLAN IP is incorrectly set to ${avIp}, and was unable to be updated. Should be set statically to 192.168.25.${cartNumber}0, subnet mask of 255.255.255.0, and with no gateway`
-                );
-            });
+    if (vlan30 && vlan30Name) {
+        const avIp = vlan30.find((i) => i.family === 'IPv4')?.address;
+        resp.av_ip_ready = avIp === `192.168.25.${cartNumber}0`;
+        if (!resp.av_ip_ready) {
+            // Call netsh to set the IP
+            await setStaticIp(
+                vlan30Name,
+                `192.168.25.${cartNumber}0`,
+                '255.255.255.0',
+                ''
+            )
+                .then(() => {
+                    resp.logs.push(
+                        `Set AV VLAN IP was incorrectly set to ${avIp}.  Set static to 192.168.25.${cartNumber}0`
+                    );
+                    resp.av_ip_ready = true;
+                    return undefined;
+                })
+                .catch((err) => {
+                    log.error('Could not set AV VLAN IP: ', err);
+                    resp.errors.push(
+                        `AV VLAN IP is incorrectly set to ${avIp}, and was unable to be updated. Should be set statically to 192.168.25.${cartNumber}0, subnet mask of 255.255.255.0, and with no gateway`
+                    );
+                });
+        }
     }
 
     if (resp.av_ip_ready) {
@@ -189,7 +207,6 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     const venueIp = vlan10?.find((i) => i.family === 'IPv4')?.address;
     resp.venue_ip_ready =
         venueIp !== undefined && !venueIp.startsWith('169.254');
-    // if (!resp.venue_ip_ready) resp.errors.push(`No IP from venue! Internet will probably not work (IP: ${venueIp})`);
 
     // Determine which interface the Field Network is plugged into
     const fieldIpVlan = vlan20?.find((i) => i.family === 'IPv4')?.address;
@@ -322,6 +339,61 @@ async function enableDhcp(interfaceName: string): Promise<boolean> {
     });
 }
 
+// Get advanced network interface info
+// See the output in assets/sample_payloads/ExampleNetworkOutput.json for some example data
+async function advancedNetworkInterfaces(): Promise<NetAdapterModel> {
+    return new Promise((resolve, reject) => {
+        // Fun commands
+        exec('powershell "Get-NetAdapterAdvancedProperty -Name \\"*\\" -AllProperties  | Format-List -Property \\"*"\\"', (error, stdout, stderr) => {
+            if (error) {
+                console.error(`Error executing command: ${error.message}`);
+                reject();
+                return;
+            }
+            if (stderr) {
+                console.error(`Command stderr: ${stderr}`);
+                reject()
+                return;
+            }
+
+            // Parse the output into a JavaScript object
+            const objs: any[] = [];
+            let index = 0;
+
+            // Split on new line and loop
+            stdout.split('\n').forEach(line => {
+                // Create object if doesn't exist
+                if (!objs[index]) objs[index] = {};
+
+                // Split on colon, trim whitespace
+                const [name, value] = line.split(':').map(part => part.trim());
+
+                // Empty line is new adapter
+                if (name === '') {
+                    index += 1;
+                } else {
+                    objs[index][name] = value;
+                }
+            });
+
+            // Convert to object key'd by "Name"
+            const byNames: any = {};
+            objs.forEach(obj => {
+                if (!byNames[obj.Name]) byNames[obj.Name] = {};
+                byNames[obj.Name][obj.ValueName] = obj.ValueData;
+            });
+            resolve(byNames);
+        });
+    });
+}
+
+/*
+* Set a static IP on a network interface
+*   interfaceName: The name of the interface to set the IP on
+*   ip: The IP address to set
+*   subnet: The subnet mask to set
+*   gateway: The gateway to set
+*/
 async function setStaticIp(
     interfaceName: string,
     ip: string,
@@ -354,6 +426,10 @@ async function setStaticIp(
     });
 }
 
+/*
+* Fetch and parse audio devices
+*   log: Electron log instance
+*/
 async function fetchAndParseAudioDevices(log: LogFunctions): Promise<SoundVolumeViewOutput[]> {
     // Fetch Devices
     const devices = await getAudioDevices(log);
@@ -376,6 +452,10 @@ async function fetchAndParseAudioDevices(log: LogFunctions): Promise<SoundVolume
     return parsed as any[];
 }
 
+/*
+* Get audio devices
+*   log: Electron log instance
+*/
 async function getAudioDevices(log: LogFunctions): Promise<SoundVolumeViewOutput[]> {
     return new Promise((resolve) => {
         // Run .\SoundVolumeView.exe /Sjson
@@ -423,7 +503,11 @@ async function getAudioDevices(log: LogFunctions): Promise<SoundVolumeViewOutput
     });
 }
 
-// Percent is 0-100
+/*
+* Set the volume of a device
+*   deviceCmdName: The command line friendly ID of the device
+*   percent: The percent to set the volume to (0-100)
+*/
 async function setVolumePercent(
     deviceCmdName: string,
     percent: number
@@ -431,10 +515,19 @@ async function setVolumePercent(
     return runSetSoundCommand('/SetVolume', deviceCmdName, percent.toString());
 }
 
+/*
+* Unmute a device
+*   deviceCmdName: The command line friendly ID of the device
+*/
 async function unmuteDevice(deviceCmdName: string): Promise<boolean> {
     return runSetSoundCommand('/Unmute', deviceCmdName);
 }
 
+/*
+* Set the default audio device
+*   deviceCmdName: The command line friendly ID of the device
+*   type: The type of device to set as default
+*/
 async function setDefaultAudioDevice(
     deviceCmdName: string,
     type: 'Console' | 'Multimedia' | 'Communications' | 'all'
@@ -442,6 +535,11 @@ async function setDefaultAudioDevice(
     return runSetSoundCommand('/SetDefault', deviceCmdName, type);
 }
 
+/*
+* Run a SoundVolumeView command
+*   cmd: The command to run
+*   params: The parameters to pass to the command
+*/
 async function runSetSoundCommand(
     cmd: string,
     ...params: string[]
@@ -450,19 +548,17 @@ async function runSetSoundCommand(
         electronLog.debug(cmd, params);
         resolve(true);
     });
-    /* TODO: investigate further
-    return new Promise((resolve, reject) => {
-        // Spawn the process
-        const proc = spawn(SoundVolumeViewPath, [cmd, ...params]);
-        // Listen for exit
-        proc.on("exit", () => {
-            resolve(true);
-        });
+    // return new Promise((resolve, reject) => {
+    //     // Spawn the process
+    //     const proc = spawn(SoundVolumeViewPath, [cmd, ...params]);
+    //     // Listen for exit
+    //     proc.on("exit", () => {
+    //         resolve(true);
+    //     });
 
-        // Listen for error
-        proc.on("error", (err) => {
-            reject(err);
-        });
-    });
-*/
+    //     // Listen for error
+    //     proc.on("error", (err) => {
+    //         reject(err);
+    //     });
+    // });
 }
