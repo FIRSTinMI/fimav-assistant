@@ -19,8 +19,8 @@ export function resolveHtmlPath(
     return `file://${path.resolve(
         __dirname,
         '../renderer/',
-        htmlFileName + (anchor ? `#${anchor}` : '')
-    )}`;
+        htmlFileName
+    )}${(anchor ? `#${anchor}` : '')}`;
 }
 
 export const RESOURCES_PATH = app.isPackaged

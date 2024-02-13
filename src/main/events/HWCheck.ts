@@ -1,6 +1,5 @@
 import { exec, spawn } from 'child_process';
 import electronLog, { LogFunctions } from 'electron-log';
-import { writeFileSync } from 'fs';
 import { NetAdapterModel } from 'models/AdvancedAdapterInfo';
 import HWCheckResponse from 'models/HWCheckResponse';
 import SoundVolumeViewOutput from 'models/SoundVolumeViewOutput';
@@ -69,15 +68,15 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
 
     // Get Network Interfaces
     const interfaces = networkInterfaces();
-    const advancedInterfaces = await advancedNetworkInterfaces();
+    const advancedInterfaces = await advancedNetworkInterfaces(log);
     let vlan10: NetworkInterfaceInfo[] | undefined;
     let vlan10Name: string | undefined;
     let vlan20: NetworkInterfaceInfo[] | undefined;
     let vlan20Name: string | undefined;
     let vlan30: NetworkInterfaceInfo[] | undefined;
     let vlan30Name: string | undefined;
-    let primaryNic: NetworkInterfaceInfo[] | undefined;
-    let primaryName: string | undefined;
+    let primaryNic: NetworkInterfaceInfo[] | undefined; // eslint-disable-line no-unused-vars
+    let primaryName: string | undefined; // eslint-disable-line no-unused-vars
     let secondaryNic: NetworkInterfaceInfo[] | undefined;
     let secondaryName: string | undefined;
 
@@ -341,17 +340,17 @@ async function enableDhcp(interfaceName: string): Promise<boolean> {
 
 // Get advanced network interface info
 // See the output in assets/sample_payloads/ExampleNetworkOutput.json for some example data
-async function advancedNetworkInterfaces(): Promise<NetAdapterModel> {
+async function advancedNetworkInterfaces(log: LogFunctions): Promise<NetAdapterModel> {
     return new Promise((resolve, reject) => {
         // Fun commands
         exec('powershell "Get-NetAdapterAdvancedProperty -Name \\"*\\" -AllProperties  | Format-List -Property \\"*"\\"', (error, stdout, stderr) => {
             if (error) {
-                console.error(`Error executing command: ${error.message}`);
+                log.error(`Error executing command: ${error.message}`);
                 reject();
                 return;
             }
             if (stderr) {
-                console.error(`Command stderr: ${stderr}`);
+                log.error(`Command stderr: ${stderr}`);
                 reject()
                 return;
             }

@@ -145,10 +145,10 @@ export default class LiveCaptions {
 
             // Log the stdout and stderr to files
             this.process.stdout.on('data', (data) => {
-                this.logs.out.info(data);
+                this.logs.out.info(data.toString());
             });
             this.process.stdout.on('data', (data) => {
-                this.logs.err.error(data);
+                this.logs.err.error(data.toString());
             });
 
             this.process.on('exit', this.onExit.bind(this));
