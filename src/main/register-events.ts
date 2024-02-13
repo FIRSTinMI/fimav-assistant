@@ -1,29 +1,38 @@
-import { IpcMain } from 'electron';
+import { BrowserWindow, ipcMain } from 'electron';
 import log from 'electron-log';
 import HWCheck from './events/HWCheck';
 import Alerts from './events/Alerts';
-import { dismissAlert } from './window_components/signalR';
+import { dismissAlert, invoke, registerListener } from './window_components/signalR';
 import { getAlertsWindow } from './window_components/alertsWindow';
 
 // Use this file to register all events. For uniformity, all events should send their response as <event-name>-response
 
-export default function registerAllEvents(ipc: IpcMain) {
-    ipc.on('hwcheck', async (event) => {
+export default function registerAllEvents(window: BrowserWindow | null) {
+    ipcMain.on('hwcheck', async (event) => {
         const out = await HWCheck();
         event.reply('hwcheck-response', out);
     });
 
-    ipc.on('alerts:getAlerts', (event) => {
+    ipcMain.on('event-info', async () => {
+        invoke('GetEvents');
+    });
+
+    // Register a SignalR listener for the Events response.  Any time an event is updated, we'll send the updated list to the renderer
+    registerListener('Events', (events) => {
+        window?.webContents.send('new-event-info', events);
+    });
+
+    ipcMain.on('alerts:getAlerts', (event) => {
         const alerts = Alerts();
         event.reply('alerts:alerts', alerts);
     });
 
-    ipc.on('alerts:dismissAlert', (_, arg) => {
+    ipcMain.on('alerts:dismissAlert', (_, arg) => {
         log.info('Dismissing alert');
         dismissAlert(arg[0] as string);
     });
 
-    ipc.on('alerts:closeWindow', () => {
+    ipcMain.on('alerts:closeWindow', () => {
         log.info('Closing alerts window');
         getAlertsWindow()?.close();
     });

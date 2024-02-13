@@ -1,12 +1,27 @@
+import { useEffect, useState } from 'react';
 import { RightOutlined } from '@ant-design/icons';
 import { Space } from 'antd';
 import Button from 'antd/es/button';
 import Typography from 'antd/es/typography';
 import { useNavigate } from 'react-router-dom';
+import Event from '../../../models/Event';
 import FiMLogo from '../../../../assets/fim_logo.png';
 
 function Welcome() {
     const nav = useNavigate();
+
+    const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
+
+    useEffect(() => {
+        // Fire off HW check and register listener
+        window.electron.ipcRenderer.on( 'new-event-info', (events: Event[]) => {
+            const current = events.filter(e => new Date(e.start) <= new Date() && new Date(e.end) >= new Date());
+            if (current.length > 0) {
+                setCurrentEvent(current[0]);
+            }
+        });
+        window.electron.ipcRenderer.sendMessage('event-info', []);
+    }, [])
 
     const handleNext = () => {
         nav('/step/1');
@@ -24,8 +39,7 @@ function Welcome() {
                 Welcome!
             </Typography.Title>
             <Typography.Title level={5}>
-                Thank you for signing up to volunteer as AV for [insert event
-                name here]
+                Thank you for signing up to volunteer as AV for {currentEvent?.name ?? 'FIRST in Michigan'}
             </Typography.Title>
 
             <Button type="primary" size="large" onClick={handleNext}>
