@@ -1,5 +1,5 @@
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
+import { app, BrowserWindow, shell, globalShortcut } from 'electron';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu'; // eslint-disable-line import/no-cycle
 import {
