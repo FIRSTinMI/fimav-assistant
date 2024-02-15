@@ -4,6 +4,7 @@ export type AppConfig = {
     signalrUrl: unknown;
     apiKey: unknown;
     liveCaptionsDownloadBase: string;
+    runOnStartup: boolean;
 };
 
 export function createStore(): Store<AppConfig> {
@@ -21,6 +22,10 @@ export function createStore(): Store<AppConfig> {
                 type: 'string',
                 default: 'https://github.com/Filip-Kin/live-captions/releases',
             },
+            runOnStartup: {
+                type: 'boolean',
+                default: true
+            },
         },
         migrations: {
             '0.0.4': (store) => {
@@ -30,6 +35,12 @@ export function createStore(): Store<AppConfig> {
                 );
                 if (!store.has('apiKey')) store.set('apiKey', null);
             },
+            '0.0.6': (store) => {
+                store.set(
+                    'runOnStartup',
+                    true
+                )
+            }
         },
     }) as Store<AppConfig>;
 }
