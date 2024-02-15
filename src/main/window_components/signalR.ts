@@ -10,48 +10,107 @@ let signalRConnection: HubConnection | null = null;
 export default function setupSignalR(
     store: Store<AppConfig>,
     createAlertsWindowCallback: () => void
-) {
-    if (signalRConnection != null)
-        throw new Error('SignalR has already been initialized');
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (signalRConnection != null)
+            throw new Error('SignalR has already been initialized');
 
-    signalRConnection = new HubConnectionBuilder()
-        .withUrl(store.get('signalrUrl') as string, {
-            accessTokenFactory: () => store.get('apiKey') as string,
-        })
-        .withAutomaticReconnect({
-            nextRetryDelayInMilliseconds(retryContext) {
-                log.warn('Retrying SignalR connection...');
-                return Math.min(
-                    2_000 * retryContext.previousRetryCount,
-                    60_000
-                );
-            },
-        })
-        .configureLogging({
-            log(logLevel, message) {
-                signalrToElectronLog(log, logLevel, message);
-            },
-        })
-        .build();
+        signalRConnection = new HubConnectionBuilder()
+            .withUrl(store.get('signalrUrl') as string, {
+                accessTokenFactory: () => store.get('apiKey') as string,
+            })
+            .withAutomaticReconnect({
+                nextRetryDelayInMilliseconds(retryContext) {
+                    log.warn('Retrying SignalR connection...');
+                    return Math.min(
+                        2_000 * retryContext.previousRetryCount,
+                        60_000
+                    );
+                },
+            })
+            .configureLogging({
+                log(logLevel, message) {
+                    signalrToElectronLog(log, logLevel, message);
+                },
+            })
+            .build();
 
-    signalRConnection.onclose((err) =>
-        log.error('SignalR connection has been lost', err)
-    );
+        signalRConnection.onclose((err) =>
+            log.error('SignalR connection has been lost', err)
+        );
 
-    signalRConnection.on('PendingAlerts', (newAlerts) => {
-        SetPendingAlerts({
-            alerts: newAlerts.map((a: any) => ({
-                id: a.id,
-                content: a.content,
-            })),
+        signalRConnection.on('PendingAlerts', (newAlerts) => {
+            SetPendingAlerts({
+                alerts: newAlerts.map((a: any) => ({
+                    id: a.id,
+                    content: a.content,
+                })),
+            });
+            if (newAlerts.length > 0) createAlertsWindowCallback();
         });
-        if (newAlerts.length > 0) createAlertsWindowCallback();
-    });
 
-    signalRConnection
-        .start()
-        .then(() => log.info('Connection to SignalR established'))
-        .catch((err) => log.error('Error connecting to SignalR', err));
+        signalRConnection
+            .start()
+            .then(() => {
+                log.info('Connection to SignalR established');
+                return resolve();
+            })
+            .catch((err) => {
+                log.error('Error connecting to SignalR', err);
+                return reject(err);
+            });
+    });
+}
+
+/*
+* This function is used to invoke a SignalR event and wait for a response.
+* @param eventName The name of the event to invoke
+* @param eventResponse The name of the event to listen for the response
+* @param args Any arguments to pass to the event
+* @returns A promise that resolves with the response from the event
+*/
+function invokeExpectResponse<t>(eventName: string, eventResponse: string, ...args: any[]): Promise<t> {
+    return new Promise<t>((resolve, reject) => {
+        if (signalRConnection == null) {
+            reject();
+            return;
+        }
+
+        const listener = (response: t) => {
+            signalRConnection?.off(eventResponse, listener);
+            resolve(response);
+        }
+        signalRConnection.on(eventResponse, listener);
+
+        signalRConnection.invoke(eventName, ...args).catch((err) => {
+            log.error(`Failed to invoke '${eventName}'`, err);
+            reject(err);
+        });
+    });
+}
+
+/*
+* This function is used to invoke a SignalR event without waiting for a response.
+* @param eventName The name of the event to invoke
+* @param args Any arguments to pass to the event
+*/
+function invoke(eventName: string, ...args: any[]): void {
+    if (signalRConnection == null) return;
+
+    signalRConnection.invoke(eventName, ...args).catch((err) => {
+        log.error(`Failed to invoke '${eventName}'`, err);
+    });
+}
+
+/*
+* This function is used to register a listener for a SignalR event.
+* @param eventName The name of the event to listen for
+* @param listener The function to call when the event is received
+*/
+function registerListener<t>(eventName: string, listener: (response: t) => void): void { // eslint-disable-line
+    if (signalRConnection == null) return;
+
+    signalRConnection.on(eventName, listener);
 }
 
 function dismissAlert(id: string): void {
@@ -67,4 +126,4 @@ function dismissAlert(id: string): void {
     });
 }
 
-export { dismissAlert };
+export { dismissAlert, invokeExpectResponse, invoke, registerListener };

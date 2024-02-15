@@ -1,5 +1,5 @@
 import path from 'path';
-import { app, BrowserWindow, shell, ipcMain, globalShortcut } from 'electron';
+import { app, BrowserWindow, shell, globalShortcut } from 'electron';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu'; // eslint-disable-line import/no-cycle
 import {
@@ -39,9 +39,6 @@ const isDebug = isDebugFn();
 
 // Addons
 const addons = new Addons().init();
-
-// Register all the event handlers
-registerAllEvents(ipcMain);
 
 if (process.env.NODE_ENV === 'production') {
     const sourceMapSupport = require('source-map-support');
@@ -162,9 +159,21 @@ if (!instanceLock) {
     });
 
     app.whenReady()
-        .then(() => {
-            createWindow();
+        .then(async () => {
             const store = getStore();
+
+            // TODO: Currently the API key is set manually by opening the config.json file
+            if (store.get('apiKey')) {
+                try {
+                    await setupSignalR(store, createAlertsWindow);
+                } catch { } // eslint-disable-line no-empty
+            }
+
+            // Create the main window
+            await createWindow();
+
+            // Register all the event handlers (Must be done AFTER setupSignalR is called and AFTER window is created)
+            registerAllEvents(mainWindow);
 
             // Register Shortcuts
             if (isDebug) {
@@ -176,11 +185,6 @@ if (!instanceLock) {
 
             // Register Tray Icon
             buildTray(mainWindow, RESOURCES_PATH, app.getVersion());
-
-            // TODO: Currently the API key is set manually by opening the config.json file
-            if (store.get('apiKey')) {
-                setupSignalR(store, createAlertsWindow);
-            }
 
             app.on('activate', () => {
                 // On macOS it's common to re-create a window in the app when the
