@@ -192,6 +192,11 @@ if (!instanceLock) {
                 if (mainWindow === null) createWindow();
             });
 
+            // Set to run this app at startup
+            app.setLoginItemSettings({
+                openAtLogin: true
+            });
+
             return undefined;
         })
         .catch(log.error);
