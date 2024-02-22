@@ -4,6 +4,7 @@ import path from 'path';
 import { app } from 'electron';
 import { LogFunctions } from 'electron-log';
 import { LogLevel } from '@microsoft/signalr';
+import { hostname } from 'os';
 
 export function resolveHtmlPath(
     htmlFileName: string,
@@ -65,6 +66,19 @@ export const signalrToElectronLog = (
         break;
     }
 };
+
+export const getCartNumberFromHostname = (): number => {
+    // Get Computer Name
+    const whoAmI = hostname().toLowerCase();
+
+    // AV Carts are maned FIMAV<number>, so lets determine which cart we are
+    let cartNumber = parseInt(whoAmI.replace(/\D/g, ''), 10);
+
+    // If we are not a cart, we are 0
+    if (Number.isNaN(cartNumber)) cartNumber = 0;
+
+    return cartNumber;
+}
 
 export const isDebug = () => process.env.NODE_ENV === 'development' || process.env.DEBUG_PROD === 'true';
 

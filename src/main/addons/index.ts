@@ -6,11 +6,14 @@ import log from 'electron-log';
 import AutoAV from './autoav';
 import LiveCaptions from './live-captions';
 import { logsPath } from '../util';
+import HWPing from './hw-ping';
 
 export default class Addons {
     private liveCaptions: LiveCaptions = LiveCaptions.Instance;
 
     private AutoAV: AutoAV = AutoAV.Instance;
+
+    private HWPing: HWPing = HWPing.Instance;
 
     public init(): Addons {
         this.restartAll();
@@ -21,6 +24,7 @@ export default class Addons {
     public stop() {
         this.liveCaptions.stop();
         this.AutoAV.stop();
+        this.HWPing.stop();
     }
 
     // Restart live captions
@@ -41,12 +45,21 @@ export default class Addons {
         this.AutoAV.start();
     }
 
+    // Restart HWPing
+    public restartHWPing() {
+        this.HWPing.stop();
+        this.HWPing.start();
+    }
+
     // Restart all
     public restartAll() {
         log.info('📦 Addons Starting...');
 
         // Stop autoav
         this.AutoAV.stop();
+
+        // Stop hwping
+        this.HWPing.stop();
 
         // Manage logs
         Addons.manageLogs();
