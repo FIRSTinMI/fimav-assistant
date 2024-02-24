@@ -50,10 +50,11 @@ export default class MenuBuilder {
                     },
                     ...(dev ? [{
                         label: 'Quit',
+                        role: 'quit',
                         click() {
                             quitApp();
                         }
-                    }] : [])
+                    }] as MenuItemConstructorOptions[] : [])
                 ],
             });
         }
@@ -143,9 +144,17 @@ export default class MenuBuilder {
                             updateNow();
                         },
                     },
+                    {
+                        label: 'Quit',
+                        accelerator: 'CommandOrControl+Alt+Shift+X',
+                        visible: false,
+                        click() {
+                            quitApp();
+                        }
+                    }
                 ],
             },
-        ]);
+        ] as MenuItemConstructorOptions[]);
 
         if (dev) {
             templateDefault.push({

@@ -194,7 +194,7 @@ if (!instanceLock) {
 
             // Set to run this app at startup
             app.setLoginItemSettings({
-                openAtLogin: store.get('runOnStartup') || false,
+                openAtLogin: !isDebug && (store.get('runOnStartup') || false),
             });
 
             return undefined;
