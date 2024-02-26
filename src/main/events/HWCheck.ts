@@ -94,15 +94,15 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
             secondaryName = key;
         }
 
-        // See if we have advanced info on this NIC
-        if (advancedInterfaces[key]) {
-            if (advancedInterfaces[key].VLAN_ID === '10') {
+        // See if we have advanced info on this NIC and the driver desc is Hyper-V
+        if (advancedInterfaces[key] && advancedInterfaces[key].DriverDesc === "{Hyper-V Virtual Ethernet Adapter}") {
+            if (advancedInterfaces[key].VLAN_ID === '10' || key.toLowerCase().includes("internet")) {
                 vlan10 = interfaces[key];
                 vlan10Name = key;
-            } else if (advancedInterfaces[key].VLAN_ID === '20') {
+            } else if (advancedInterfaces[key].VLAN_ID === '20' || key.toLowerCase().includes("field")) {
                 vlan20 = interfaces[key];
                 vlan20Name = key;
-            } else if (advancedInterfaces[key].VLAN_ID === '30') {
+            } else if (advancedInterfaces[key].VLAN_ID === '30' || key.toLowerCase().includes("av")) {
                 vlan30 = interfaces[key];
                 vlan30Name = key;
             }
@@ -238,15 +238,15 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
         }
     );
 
-    // Ensure that "IN 1-2" of "BEHRINGER X-AIR" is the default, is unmuted, and the volume is over 75%
+    // Ensure that "OUT 1-2" of "BEHRINGER X-AIR" is the default, is unmuted, and the volume is over 75%
     const xAirIndex = resp.audio_devices_found.findIndex(
-        (a) => a.name === 'IN 1-2' && a.sub_name.includes('BEHRINGER X-AIR')
+        (a) => a.name === 'OUT 1-2' && a.sub_name.includes('BEHRINGER X-AIR')
     );
     const xAir = resp.audio_devices_found[xAirIndex];
 
     if (!xAir) {
         resp.errors.push(
-            "Could not find BEHRINGER X-AIR 'IN 1-2' audio device.  Contact FIMAV Support for assistance."
+            "Could not find BEHRINGER X-AIR 'OUT 1-2' audio device.  Contact FIMAV Support for assistance."
         );
     } else {
         // Mark audio as ready.  If we later find an error that we can't fix, we will set this to false
@@ -257,14 +257,14 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
             await setDefaultAudioDevice(xAir.name, 'all')
                 .then(() => {
                     resp.logs.push(
-                        `Set BEHRINGER X-AIR 'IN 1-2' as default audio device.`
+                        `Set BEHRINGER X-AIR 'OUT 1-2' as default audio device.`
                     );
                     resp.audio_devices_found[xAirIndex].default = 'Render';
                     return undefined;
                 })
                 .catch((err) => {
                     resp.errors.push(
-                        `Could not set BEHRINGER X-AIR 'IN 1-2' as default audio device.  Please select it from the task bar.`
+                        `Could not set BEHRINGER X-AIR 'OUT 1-2' as default audio device.  Please select it from the task bar.`
                     );
                     log.error('Could not set default device: ', err);
                     resp.audio_ready = false;
@@ -274,24 +274,24 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
             // Muted
             await unmuteDevice(xAir.name)
                 .then(() => {
-                    resp.logs.push(`Unmuted BEHRINGER X-AIR 'IN 1-2'`);
+                    resp.logs.push(`Unmuted BEHRINGER X-AIR 'OUT 1-2'`);
                     resp.audio_devices_found[xAirIndex].muted = false;
                     return undefined;
                 })
                 .catch((err) => {
                     resp.errors.push(
-                        `Could not unmute BEHRINGER X-AIR 'IN 1-2'.  Please unmute it from the task bar.`
+                        `Could not unmute BEHRINGER X-AIR 'OUT 1-2'.  Please unmute it from the task bar.`
                     );
                     log.error('Could not unmute device: ', err);
                     resp.audio_ready = false;
                 });
         }
-        if (parseInt(xAir.volume_percent.replace('%', ''), 10) < 75) {
-            // Percetage is less than 75%
-            await setVolumePercent(xAir.name, 75)
+        if (parseInt(xAir.volume_percent.replace('%', ''), 10) < 100) {
+            // Percetage is less than 100%
+            await setVolumePercent(xAir.name, 100)
                 .then(() => {
                     resp.logs.push(
-                        `Set BEHRINGER X-AIR 'IN 1-2' volume to 75%`
+                        `Set BEHRINGER X-AIR 'OUT 1-2' volume to 75%`
                     );
                     resp.audio_devices_found[xAirIndex].volume_percent =
                         '75.0%';
@@ -299,13 +299,19 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
                 })
                 .catch((err) => {
                     resp.errors.push(
-                        `Could not set BEHRINGER X-AIR 'IN 1-2' volume to 75%.  Please set it from the task bar.`
+                        `Could not set BEHRINGER X-AIR 'OUT 1-2' volume to 75%.  Please set it from the task bar.`
                     );
                     log.error('Could not set volume: ', err);
                     resp.audio_ready = false;
                 });
         }
     }
+
+    const keysToExclude = ['id', 'registry_key'];
+
+    resp.audio_devices_found.map((device: any) =>
+        keysToExclude.forEach(key => delete device[key])
+    )
 
     resp.cart_number = cartNumber;
 
@@ -543,21 +549,21 @@ async function runSetSoundCommand(
     cmd: string,
     ...params: string[]
 ): Promise<boolean> {
-    return new Promise((resolve) => {
-        electronLog.debug(cmd, params);
-        resolve(true);
-    });
-    // return new Promise((resolve, reject) => {
-    //     // Spawn the process
-    //     const proc = spawn(SoundVolumeViewPath, [cmd, ...params]);
-    //     // Listen for exit
-    //     proc.on("exit", () => {
-    //         resolve(true);
-    //     });
-
-    //     // Listen for error
-    //     proc.on("error", (err) => {
-    //         reject(err);
-    //     });
+    // return new Promise((resolve) => {
+    //     electronLog.debug(cmd, params);
+    //     resolve(true);
     // });
+    return new Promise((resolve, reject) => {
+        // Spawn the process
+        const proc = spawn(SoundVolumeViewPath, [cmd, ...params]);
+        // Listen for exit
+        proc.on("exit", () => {
+            resolve(true);
+        });
+
+        // Listen for error
+        proc.on("error", (err) => {
+            reject(err);
+        });
+    });
 }
