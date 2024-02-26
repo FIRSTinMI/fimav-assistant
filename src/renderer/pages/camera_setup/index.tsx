@@ -95,7 +95,7 @@ function InternetSetup({ nextStep, previousStep }: Steppable) {
 
                 <Typography.Text>
                     <ReadyHandler
-                        ready={cam1 ? ReadyState.Ready : ReadyState.NotReady}
+                        ready={cam2 ? ReadyState.Ready : ReadyState.NotReady}
                     />{' '}
                     Camera 2
                 </Typography.Text>
