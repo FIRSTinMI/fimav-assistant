@@ -323,6 +323,7 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
 async function enableDhcp(interfaceName: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
         // Run netsh interface ipv4 set address name="Ethernet" static
+        return resolve(true);
         const proc = spawn('netsh', [
             'interface',
             'ipv4',
