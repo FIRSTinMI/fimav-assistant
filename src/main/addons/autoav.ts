@@ -186,8 +186,6 @@ export default class AutoAV {
             .catch((err) => {
                 this.log(`AutoAV FMS Connection Failed: ${err}`);
             });
-
-        setInterval(() => console.log("running"), 1000)
     }
 
     // Stop AutoAV
