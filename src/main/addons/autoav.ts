@@ -7,6 +7,7 @@ import attemptRename from '../../utils/recording';
 import { AddonLoggers } from './addon-loggers';
 import { signalrToElectronLog } from '../util';
 
+
 export default class AutoAV {
     private static instance: AutoAV;
 
@@ -43,7 +44,9 @@ export default class AutoAV {
 
         // Build a connection to the SignalR Hub
         this.hubConnection = new HubConnectionBuilder()
-            .withUrl('http://10.0.100.5:8189/infrastructureHub')
+            .withUrl('http://10.0.100.5/infrastructureHub')
+            .withServerTimeout(30000) // 30 seconds, per FMS Audience Display
+            .withKeepAliveInterval(15000) // 15 seconds per FMS Audience Display
             .configureLogging({
                 log: (logLevel, message) => {
                     signalrToElectronLog(
@@ -53,6 +56,7 @@ export default class AutoAV {
                     );
                 },
             })
+            // .withHubProtocol(new MessagePackHubProtocol())
             .withAutomaticReconnect()
             .build();
 
@@ -159,6 +163,10 @@ export default class AutoAV {
             return this;
         });
 
+        // Dummies to get log to shush
+        this.hubConnection.on('fieldnetworkstatus', () => {});
+        this.hubConnection.on('plc_io_status_changed', () => {});
+
         // Register connected/disconnected events
         this.hubConnection.onreconnecting(() => {
             this.log('AutoAV FMS Connection Lost, Reconnecting');
@@ -178,6 +186,8 @@ export default class AutoAV {
             .catch((err) => {
                 this.log(`AutoAV FMS Connection Failed: ${err}`);
             });
+
+        setInterval(() => console.log("running"), 1000)
     }
 
     // Stop AutoAV
