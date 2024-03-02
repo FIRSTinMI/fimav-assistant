@@ -67,9 +67,9 @@ export default class AutoAV {
                 // Log the change
                 this.log(
                     `Match Status Changed: ${
-                        this.lastState ? this.lastState.p1 : 'Unknown'
-                    } -> ${info.p1} for ${info.p4} Match ${info.p2} (Play #${
-                        info.p3
+                        this.lastState ? this.lastState.MatchState : 'Unknown'
+                    } -> ${info.MatchState} for ${info.Level} Match ${info.MatchNumber} (Play #${
+                        info.PlayNumber
                     })`
                 );
 
@@ -77,7 +77,7 @@ export default class AutoAV {
                 this.lastState = info;
 
                 // Start recording when GameSpecificData is released (match starts)
-                if (info.p1 === 'GameSpecificData') {
+                if (info.MatchState === 'GameSpecificData') {
                     vmixService
                         .StartRecording()
                         .then(() => {
@@ -106,8 +106,8 @@ export default class AutoAV {
                 );
                 const switchOption = await resp.text();
                 this.log(`Got Switch Option: ${switchOption}`);
-                // MatchResult
-                if (parseInt(switchOption, 10) === 4) {
+                // "MatchResult" (yes, double quotes are included in the response)
+                if (switchOption === '"MatchResult"') {
                     this.log('🚀 Scores Posted. Waiting 10 Seconds...');
 
                     // TODO: Request the recording location and event name from parent process
@@ -163,9 +163,12 @@ export default class AutoAV {
             return this;
         });
 
+        const bogusEvents = ["fieldnetworkstatus", "matchtimerchanged", "plc_io_status_changed", "plc_match_status_changed"]
+
         // Dummies to get log to shush
-        this.hubConnection.on('fieldnetworkstatus', () => {});
-        this.hubConnection.on('plc_io_status_changed', () => {});
+        bogusEvents.forEach(e => {
+            this.hubConnection?.on(e, () => {})
+        })
 
         // Register connected/disconnected events
         this.hubConnection.onreconnecting(() => {
