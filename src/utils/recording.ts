@@ -49,7 +49,7 @@ export default async function attemptRename(
             // Build the file name
             const playString =
                 matchStatus.PlayNumber > 1 ? ` (Play #${matchStatus.PlayNumber})` : '';
-            const newFileName = `${eventName} - ${matchStatus.p4} Match ${matchStatus.MatchNumber}${playString}.mp4`;
+            const newFileName = `${eventName} - ${matchStatus.Level} Match ${matchStatus.MatchNumber}${playString}.mp4`;
 
             // Check if event name folder exists
             const eventFolder = path.resolve(videoLocation, eventName);
