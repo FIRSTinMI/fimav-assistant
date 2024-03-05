@@ -5,6 +5,7 @@ import InternetSetup from './pages/internet_setup';
 import Alerts from './pages/alerts';
 import CameraSetup from './pages/camera_setup';
 import FallbackToDocs from './pages/fallbackToDocs';
+import StepManager from './components/StepManager';
 
 let Router: typeof HashRouter | typeof BrowserRouter;
 if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
@@ -16,6 +17,10 @@ if (!process.env.NODE_ENV || process.env.NODE_ENV === 'development') {
 function AppRoutes() {
     return (
         <Router>
+            {/* This manages routing back to the last completed step */}
+            <StepManager />
+
+            {/* App Routes */}
             <Routes>
                 <Route path="/" element={<Welcome />} />
                 <Route path="/alerts" element={<Alerts />} />

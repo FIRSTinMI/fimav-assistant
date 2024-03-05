@@ -3,13 +3,20 @@ import log from 'electron-log';
 import HWPingResponse from 'models/HWPingResponse';
 import HWCheck from './events/HWCheck';
 import Alerts from './events/Alerts';
-import { dismissAlert, invoke, registerListener } from './window_components/signalR';
+import {
+    dismissAlert,
+    invoke,
+    registerListener,
+} from './window_components/signalR';
 import { getAlertsWindow } from './window_components/alertsWindow';
 import HWPing from './addons/hw-ping';
+import { getStore } from './store';
 
 // Use this file to register all events. For uniformity, all events should send their response as <event-name>-response
 
 export default function registerAllEvents(window: BrowserWindow | null) {
+    const store = getStore();
+
     ipcMain.on('hwcheck', async (event) => {
         const out = await HWCheck();
         event.reply('hwcheck-response', out);
@@ -21,7 +28,52 @@ export default function registerAllEvents(window: BrowserWindow | null) {
 
     ipcMain.on('hw-status', (event) => {
         event.reply('hw-change', HWPing.Instance.currentStatus);
-    })
+    });
+
+    ipcMain.on('steps:set', (_, [step]) => {
+        store.set('currentStep', step);
+        if (store.get('stepsStartedAt') === 0) {
+            store.set('stepsStartedAt', new Date().getTime());
+        }
+    });
+
+    ipcMain.on('steps:get', (event) => {
+        // This is the step that we'll reply with
+        let stepToReply = 0;
+
+        // Get the step start date
+        const lastStart = store.get('stepsStartedAt');
+
+        // If we don't have a date key (I.E. it's 0), we haven't started the steps yet
+        if (!lastStart) {
+            stepToReply = 0;
+        } else {
+            // Convert to date
+            const startDate = new Date(lastStart);
+
+            // If today is Monday, and the start date is not today, reset the steps
+            const todayIsMonday = new Date().getDay() === 1;
+            const startDateIsToday =
+                startDate.toDateString() === new Date().toDateString();
+
+            if (todayIsMonday && !startDateIsToday) {
+                store.set('stepsStartedAt', 0);
+                store.set('currentStep', 0);
+                stepToReply = 0;
+            } else {
+                // Otherwise, we're clear to continue where we left off.  If we don't have a step, we'll start at 0
+                const step = store.get('currentStep');
+                if (step) {
+                    stepToReply = step;
+                } else {
+                    stepToReply = 0;
+                }
+            }
+        }
+
+        // Reply with the step
+        event.reply('steps:get', stepToReply);
+    });
 
     // Register a SignalR listener for the Events response.  Any time an event is updated, we'll send the updated list to the renderer
     registerListener('Events', (events) => {

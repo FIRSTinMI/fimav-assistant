@@ -5,6 +5,8 @@ export type AppConfig = {
     apiKey: unknown;
     liveCaptionsDownloadBase: string;
     runOnStartup: boolean;
+    currentStep: number;
+    stepsStartedAt: number;
 };
 
 export function createStore(): Store<AppConfig> {
@@ -24,7 +26,15 @@ export function createStore(): Store<AppConfig> {
             },
             runOnStartup: {
                 type: 'boolean',
-                default: true
+                default: true,
+            },
+            currentStep: {
+                type: 'number',
+                default: 0,
+            },
+            stepsStartedAt: {
+                type: 'number',
+                default: 0,
             },
         },
         migrations: {
@@ -36,11 +46,12 @@ export function createStore(): Store<AppConfig> {
                 if (!store.has('apiKey')) store.set('apiKey', null);
             },
             '0.0.6': (store) => {
-                store.set(
-                    'runOnStartup',
-                    true
-                )
-            }
+                store.set('runOnStartup', true);
+            },
+            '0.0.11': (store) => {
+                store.set('currentStep', 0);
+                store.set('stepsStartedAt', 0);
+            },
         },
     }) as Store<AppConfig>;
 }

@@ -6,6 +6,7 @@ import Typography from 'antd/es/typography';
 import { useNavigate } from 'react-router-dom';
 import Event from '../../../models/Event';
 import FiMLogo from '../../../../assets/fim_logo.png';
+import { storeStep } from 'renderer/web_utils/step_manager';
 
 function Welcome() {
     const nav = useNavigate();
@@ -14,16 +15,21 @@ function Welcome() {
 
     useEffect(() => {
         // Fire off HW check and register listener
-        window.electron.ipcRenderer.on( 'new-event-info', (events: Event[]) => {
-            const current = events.filter(e => new Date(e.start) <= new Date() && new Date(e.end) >= new Date());
+        window.electron.ipcRenderer.on('new-event-info', (events: Event[]) => {
+            const current = events.filter(
+                (e) =>
+                    new Date(e.start) <= new Date() &&
+                    new Date(e.end) >= new Date()
+            );
             if (current.length > 0) {
                 setCurrentEvent(current[0]);
             }
         });
         window.electron.ipcRenderer.sendMessage('event-info', []);
-    }, [])
+    }, []);
 
     const handleNext = () => {
+        storeStep(1);
         nav('/step/1');
     };
 
@@ -39,11 +45,13 @@ function Welcome() {
                 Welcome!
             </Typography.Title>
             <Typography.Title level={5}>
-                Thank you for signing up to volunteer as AV for {currentEvent?.name ?? 'FIRST in Michigan'}
+                Thank you for signing up to volunteer as AV for{' '}
+                {currentEvent?.name ?? 'FIRST in Michigan'}
             </Typography.Title>
 
             <Button type="primary" size="large" onClick={handleNext}>
-                Let&apos;s Get Started <RightOutlined className="btn-icon-bounce" />
+                Let&apos;s Get Started{' '}
+                <RightOutlined className="btn-icon-bounce" />
             </Button>
         </Space>
     );
