@@ -147,7 +147,7 @@ export default class AutoAV {
                                 // TODO: Make dynamic and configurable
                                 this.currentFile = getNewestFile(
                                     'C:\\Users\\FIM\\Documents\\vMixStorage')
-                            })
+                            }, 3000)
 
                             return undefined;
                         })
