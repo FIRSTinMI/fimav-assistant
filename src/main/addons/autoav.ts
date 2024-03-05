@@ -1,7 +1,7 @@
 import { HubConnection, HubConnectionBuilder } from '@microsoft/signalr';
 import nodeFetch from 'node-fetch';
 import log from 'electron-log';
-import { invokeExpectResponse } from 'main/window_components/signalR';
+import { invokeExpectResponse } from '../window_components/signalR';
 import VmixRecordingService from '../../services/VmixService';
 import FMSMatchStatus from '../../models/FMSMatchState';
 import attemptRename, { getNewestFile } from '../../utils/recording';
