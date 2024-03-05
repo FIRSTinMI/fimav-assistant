@@ -10,6 +10,8 @@ import { updateNow } from '../updates/update';
 import { isDebug, logsPath } from '../util';
 import createAlertsWindow, { getAlertsWindow } from './alertsWindow';
 import { quitApp } from '../main'; // eslint-disable-line import/no-cycle
+import VmixService from '../../services/VmixService';
+import { XMLParser } from 'fast-xml-parser';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
     selector?: string;
@@ -18,7 +20,6 @@ interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
 
 export default class MenuBuilder {
     mainWindow: BrowserWindow;
-
     addons: Addons;
 
     constructor(mainWindow: BrowserWindow, addons: Addons) {
@@ -38,7 +39,7 @@ export default class MenuBuilder {
     buildDefaultTemplate(dev: boolean) {
         const that = this;
         const templateDefault: MenuItemConstructorOptions[] = [];
-        
+
         if (platform() === 'darwin') {
             templateDefault.push({
                 label: 'FiM AV Assistant',
@@ -48,113 +49,127 @@ export default class MenuBuilder {
                         label: 'About FiM AV Assistant',
                         role: 'about',
                     },
-                    ...(dev ? [{
-                        label: 'Quit',
-                        role: 'quit',
-                        click() {
-                            quitApp();
-                        }
-                    }] as MenuItemConstructorOptions[] : [])
+                    ...(dev
+                        ? ([
+                              {
+                                  label: 'Quit',
+                                  role: 'quit',
+                                  click() {
+                                      quitApp();
+                                  },
+                              },
+                          ] as MenuItemConstructorOptions[])
+                        : []),
                 ],
             });
         }
 
-        templateDefault.push(...[
-            {
-                label: 'Alerts',
-                submenu: [
-                    {
-                        label: 'View Alerts',
-                        click() {
-                            const alertsWindow = getAlertsWindow();
-                            if (alertsWindow) {
-                                alertsWindow.show();
-                            } else {
-                                createAlertsWindow();
-                            }
-                        }
-                    }
-                ]
-            },
-            {
-                label: 'Addons',
-                submenu: [
-                    {
-                        label: 'Live Captions',
-                        submenu: [
-                            {
-                                label: 'Restart',
-                                click() {
-                                    that.addons.restartLiveCaptions();
-                                },
+        templateDefault.push(
+            ...([
+                {
+                    label: 'Alerts',
+                    submenu: [
+                        {
+                            label: 'View Alerts',
+                            click() {
+                                const alertsWindow = getAlertsWindow();
+                                if (alertsWindow) {
+                                    alertsWindow.show();
+                                } else {
+                                    createAlertsWindow();
+                                }
                             },
-                            {
-                                label: 'Settings',
-                                click() {
-                                    MenuBuilder.openLiveCapSettings();
+                        },
+                    ],
+                },
+                {
+                    label: 'Addons',
+                    submenu: [
+                        {
+                            label: 'Live Captions',
+                            submenu: [
+                                {
+                                    label: 'Add input to vMix',
+                                    click() {
+                                        MenuBuilder.addLiveCapInput();
+                                    },
                                 },
-                            },
-                            {
-                                label: 'About',
-                                click() {
-                                    MenuBuilder.openLiveCapSettings('about');
+                                {
+                                    label: 'Restart',
+                                    click() {
+                                        that.addons.restartLiveCaptions();
+                                    },
                                 },
-                            },
-                        ],
-                    },
-                    {
-                        label: 'AutoAV',
-                        submenu: [
-                            {
-                                label: 'Restart',
-                                click() {
-                                    that.addons.restartAutoAV();
+                                {
+                                    label: 'Settings',
+                                    click() {
+                                        MenuBuilder.openLiveCapSettings();
+                                    },
                                 },
+                                {
+                                    label: 'About',
+                                    click() {
+                                        MenuBuilder.openLiveCapSettings(
+                                            'about'
+                                        );
+                                    },
+                                },
+                            ],
+                        },
+                        {
+                            label: 'AutoAV',
+                            submenu: [
+                                {
+                                    label: 'Restart',
+                                    click() {
+                                        that.addons.restartAutoAV();
+                                    },
+                                },
+                            ],
+                        },
+                        {
+                            label: 'Restart All',
+                            click() {
+                                that.addons.restartAll();
                             },
-                        ],
-                    },
-                    {
-                        label: 'Restart All',
-                        click() {
-                            that.addons.restartAll();
                         },
-                    },
-                ],
-            },
-            {
-                label: 'About',
-                submenu: [
-                    {
-                        label: 'FIRST in Michigan',
-                        click() {
-                            shell.openExternal(
-                                'https://www.firstinmichigan.org'
-                            );
+                    ],
+                },
+                {
+                    label: 'About',
+                    submenu: [
+                        {
+                            label: 'FIRST in Michigan',
+                            click() {
+                                shell.openExternal(
+                                    'https://www.firstinmichigan.org'
+                                );
+                            },
                         },
-                    },
-                    {
-                        label: 'View Logs',
-                        click() {
-                            shell.openPath(logsPath);
+                        {
+                            label: 'View Logs',
+                            click() {
+                                shell.openPath(logsPath);
+                            },
                         },
-                    },
-                    {
-                        label: 'Check for Updates (app may restart)',
-                        click() {
-                            updateNow();
+                        {
+                            label: 'Check for Updates (app may restart)',
+                            click() {
+                                updateNow();
+                            },
                         },
-                    },
-                    {
-                        label: 'Quit',
-                        accelerator: 'CommandOrControl+Alt+Shift+X',
-                        visible: false,
-                        click() {
-                            quitApp();
-                        }
-                    }
-                ],
-            },
-        ] as MenuItemConstructorOptions[]);
+                        {
+                            label: 'Quit',
+                            accelerator: 'CommandOrControl+Alt+Shift+X',
+                            visible: false,
+                            click() {
+                                quitApp();
+                            },
+                        },
+                    ],
+                },
+            ] as MenuItemConstructorOptions[])
+        );
 
         if (dev) {
             templateDefault.push({
@@ -198,5 +213,43 @@ export default class MenuBuilder {
         });
         window.loadURL(`http://localhost:3000/settings.html#${submenu}`);
         window.show();
+    }
+
+    static async addLiveCapInput() {
+        const service = new VmixService({
+            baseUrl: 'http://127.0.0.1:8000/api',
+            username: 'user',
+            password: 'pass',
+        });
+
+        try {
+            // Add input to vMix
+            await service.AddBrowserInput('http://127.0.0.1:3000/');
+
+            // Get inputs
+            const inputs = await service.GetInputs();
+
+            // Inputs is XML, parse it
+            const parsed = new XMLParser({
+                ignoreAttributes: false,
+                attributeNamePrefix: '',
+            }).parse(inputs);
+
+            // Find the input we just added
+            for (let input of parsed.vmix.inputs.input) {
+                console.log(input);
+                if (
+                    input.type === 'Browser' &&
+                    input.title === 'Browser 127.0.0.1'
+                ) {
+                    // Rename it
+                    await service.RenameInput(input.key, 'Live Captions');
+                    break;
+                }
+            }
+        } catch (err) {
+            // Sadness
+            console.error(err);
+        }
     }
 }
