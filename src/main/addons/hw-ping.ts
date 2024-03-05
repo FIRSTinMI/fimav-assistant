@@ -23,6 +23,7 @@ export default class HWPing {
         camera2: false,
         mixer: false,
         switch: false,
+        internet: false,
         errors: [],
     };
 
@@ -31,8 +32,8 @@ export default class HWPing {
     constructor() {
         // Start new log files
         this.logs = {
-            out: log.scope('autoav.out'),
-            err: log.scope('autoav.err'),
+            out: log.scope('hwping.out'),
+            err: log.scope('hwping.err'),
         };
 
         this.cartNumber = getCartNumberFromHostname();
@@ -47,14 +48,16 @@ export default class HWPing {
             this.interval = null;
         }
 
+        // Initial Ping
+        this.ping();
+
         // Start pinging every 10 seconds
-        this.interval = setInterval(this.ping, 10000);
+        this.interval = setInterval(() => this.ping(), 10000);
     }
 
     // Ping the hardware
     private async ping() {
         const promises = [
-            // TODO: Ensure these are the right IPs
             // Ping switch
             ping.promise.probe(`192.168.25.10${this.cartNumber}`, pingConfig),
             // Ping mixer
@@ -63,6 +66,8 @@ export default class HWPing {
             ping.promise.probe(`192.168.25.${this.cartNumber}3`, pingConfig),
             // Ping PTZ2
             ping.promise.probe(`192.168.25.${this.cartNumber}4`, pingConfig),
+            // Ping Internet
+            ping.promise.probe('docs.fimav.us', pingConfig),
         ];
 
         // Execute the pings
@@ -101,12 +106,21 @@ export default class HWPing {
                         didUpdate = true;
                     }
                     break;
+                case 4:
+                    if (this.currentState.internet !== res.alive) {
+                        this.currentState.internet = res.alive;
+                        didUpdate = true;
+                    }
+                    break;
                 default:
                     break;
             }
         });
 
         if (didUpdate) {
+            // Print the change
+            this.log(`HW Change: ${JSON.stringify(this.currentState, null, 2)}`);
+
             // Emit the change
             this.emitter.emit('hw-change', this.currentState);
         }
