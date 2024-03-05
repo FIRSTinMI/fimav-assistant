@@ -1,22 +1,37 @@
 import { HubConnection, HubConnectionBuilder } from '@microsoft/signalr';
 import nodeFetch from 'node-fetch';
 import log from 'electron-log';
+import { invokeExpectResponse } from 'main/window_components/signalR';
 import VmixRecordingService from '../../services/VmixService';
 import FMSMatchStatus from '../../models/FMSMatchState';
-import attemptRename from '../../utils/recording';
+import attemptRename, { getNewestFile } from '../../utils/recording';
 import { AddonLoggers } from './addon-loggers';
 import { signalrToElectronLog } from '../util';
+import Event from '../../models/Event';
 
 export default class AutoAV {
     private static instance: AutoAV;
 
-    // Last Match "Start"
-    private lastMatchStartTime: Date | null = null;
+    // Match data from the last time the match started
     private lastMatchStartData: FMSMatchStatus | null = null;
+
+    // Last match state received
     private lastState: FMSMatchStatus | null = null;
+
+    // SignalR Hub Connection
     private hubConnection: HubConnection | null = null;
+
+    // Loggers
     private logs: AddonLoggers | null = null;
+
+    // VMix Service
     private vmixService: VmixRecordingService | null = null;
+
+    // Last file recorded
+    private currentFile: string | null = null;
+
+    // Current event name
+    private currentEventName: string | null = null;
 
     constructor() {
         // Start new log files
@@ -34,19 +49,30 @@ export default class AutoAV {
                 this.log('🟥 Stopped Recording');
 
                 // If we don't have a start time or data, don't try to rename
-                if (!this.lastMatchStartTime || !this.lastMatchStartData)
+                if (!this.lastMatchStartData)
                     return undefined;
 
-                // Start trying to rename file // TODO: Make dynamic and configurable
-                const recordingLocation =
-                    'C:\\Users\\FIM\\Documents\\vMixStorage';
+                // If we don't have an event name, try to get it
+                if (!this.currentEventName || this.currentEventName.length === 0) {
+                    const events = await invokeExpectResponse<Event[]>('GetEvents', 'Events');
+                    if (events.length > 0) {
+                        const now = new Date();
+                        const currentEvent = events.find(
+                            (e) => now >= new Date(e.start) && now <= new Date(e.end)
+                        );
+                        if (currentEvent) {
+                            this.setEventName(currentEvent.name);
+                        } else {
+                            this.setEventName('');
+                        }
+                    }
+                }
 
                 // Attempt to rename the file
                 try {
                     const filename = await attemptRename(
-                        'eventName',
-                        recordingLocation,
-                        this.lastMatchStartTime,
+                        this.currentEventName ?? 'Unknown Event',
+                        this.currentFile,
                         this.lastMatchStartData
                     );
 
@@ -54,7 +80,6 @@ export default class AutoAV {
                 } catch (err) {
                     this.log(`‼️ Error Renaming Recording: ${err}`, 'err');
                 } finally {
-                    this.lastMatchStartTime = null;
                     this.lastMatchStartData = null;
                 }
 
@@ -101,10 +126,8 @@ export default class AutoAV {
             (info: FMSMatchStatus) => {
                 // Log the change
                 this.log(
-                    `Match Status Changed: ${
-                        this.lastState ? this.lastState.MatchState : 'Unknown'
-                    } -> ${info.MatchState} for ${info.Level} Match ${
-                        info.MatchNumber
+                    `Match Status Changed: ${this.lastState ? this.lastState.MatchState : 'Unknown'
+                    } -> ${info.MatchState} for ${info.Level} Match ${info.MatchNumber
                     } (Play #${info.PlayNumber})`
                 );
 
@@ -112,13 +135,19 @@ export default class AutoAV {
                 this.lastState = info;
 
                 // Start recording when GameSpecificData is released (match starts)
-                if (info.MatchState === 'GameSpecificData' && !!this.vmixService ) {
+                if (info.MatchState === 'GameSpecificData' && !!this.vmixService) {
                     this.vmixService
                         .StartRecording()
                         .then(() => {
                             this.log('🔴 Started Recording');
                             this.lastMatchStartData = info;
-                            this.lastMatchStartTime = new Date();
+
+                            // Give it some time, then attempt to find the file
+                            setTimeout(() => {
+                                // TODO: Make dynamic and configurable
+                                this.currentFile = getNewestFile(
+                                    'C:\\Users\\FIM\\Documents\\vMixStorage')
+                            })
 
                             return undefined;
                         })
@@ -126,9 +155,7 @@ export default class AutoAV {
                             this.log(`‼️ Error Starting Recording: ${err}`);
                         });
                 } else if (info.MatchState === 'MatchCancelled') { // Estop!
-                    // TODO: Get the recording location and event name from config
-                    // TODO: Make this time dynamic and configurable
-                    setTimeout(this.stopRecording, 10000); // Ok, but we wanna see the frantic running around for a bit
+                    setTimeout(() => this.stopRecording(), 10000); // Ok, but we wanna see the frantic running around for a bit
                 }
             }
         );
@@ -149,9 +176,8 @@ export default class AutoAV {
                 if (switchOption === '"MatchResult"') {
                     this.log('🚀 Scores Posted. Waiting 16 Seconds...');
 
-                    // TODO: Get the recording location and event name from config
                     // TODO: Make this time dynamic and configurable
-                    setTimeout(this.stopRecording, 16000); // As of 2024, the time to actually see the match detailts happens at about 11 seconds, so we'll wait 16 seconds to be safe
+                    setTimeout(() => this.stopRecording(), 16000); // As of 2024, the time to actually see the match detailts happens at about 11 seconds, so we'll wait 16 seconds to be safe
                 }
             }
 
@@ -167,7 +193,7 @@ export default class AutoAV {
 
         // Dummies to get log to shush
         bogusEvents.forEach((e) => {
-            this.hubConnection?.on(e, () => {});
+            this.hubConnection?.on(e, () => { });
         });
 
         // Register connected/disconnected events
@@ -203,6 +229,11 @@ export default class AutoAV {
     private log(msg: string, severity: 'out' | 'err' = 'out') {
         if (!this.logs) throw new Error('Loggers have not been configured.');
         this.logs[severity].log(msg);
+    }
+
+    // Set the event name
+    public setEventName(eventName: string) {
+        this.currentEventName = eventName;
     }
 
     public static get Instance(): AutoAV {

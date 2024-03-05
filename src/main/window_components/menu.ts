@@ -1,3 +1,4 @@
+/* eslint-disable import/order */
 import {
     Menu,
     shell,
@@ -20,6 +21,7 @@ interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
 
 export default class MenuBuilder {
     mainWindow: BrowserWindow;
+
     addons: Addons;
 
     constructor(mainWindow: BrowserWindow, addons: Addons) {
@@ -51,14 +53,14 @@ export default class MenuBuilder {
                     },
                     ...(dev
                         ? ([
-                              {
-                                  label: 'Quit',
-                                  role: 'quit',
-                                  click() {
-                                      quitApp();
-                                  },
-                              },
-                          ] as MenuItemConstructorOptions[])
+                            {
+                                label: 'Quit',
+                                role: 'quit',
+                                click() {
+                                    quitApp();
+                                },
+                            },
+                        ] as MenuItemConstructorOptions[])
                         : []),
                 ],
             });
@@ -235,21 +237,22 @@ export default class MenuBuilder {
                 attributeNamePrefix: '',
             }).parse(inputs);
 
+
             // Find the input we just added
-            for (let input of parsed.vmix.inputs.input) {
-                console.log(input);
+            let found = false;
+            parsed.vmix.inputs.input.forEach(async (input: any) => {
                 if (
+                    !found &&
                     input.type === 'Browser' &&
                     input.title === 'Browser 127.0.0.1'
                 ) {
                     // Rename it
                     await service.RenameInput(input.key, 'Live Captions');
-                    break;
+                    found = true;
                 }
-            }
+            });
         } catch (err) {
             // Sadness
-            console.error(err);
         }
     }
 }

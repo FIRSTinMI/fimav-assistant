@@ -54,7 +54,7 @@ export default class VmixRecordingService {
         const response = await fetch(`${this.settings.baseUrl}`, {
             headers: this.createHeaders(),
         });
-        return await response.text();
+        return response.text();
     }
 
     async RenameInput(guid: string, name: string): Promise<void> {

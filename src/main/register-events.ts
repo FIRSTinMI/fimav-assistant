@@ -11,6 +11,8 @@ import {
 import { getAlertsWindow } from './window_components/alertsWindow';
 import HWPing from './addons/hw-ping';
 import { getStore } from './store';
+import Event from '../models/Event';
+import AutoAV from './addons/autoav';
 
 // Use this file to register all events. For uniformity, all events should send their response as <event-name>-response
 
@@ -76,8 +78,21 @@ export default function registerAllEvents(window: BrowserWindow | null) {
     });
 
     // Register a SignalR listener for the Events response.  Any time an event is updated, we'll send the updated list to the renderer
-    registerListener('Events', (events) => {
+    registerListener('Events', (events: Event[]) => {
         window?.webContents.send('new-event-info', events);
+
+        // Find the event that is current running (date is between start and end)
+        const now = new Date();
+        const currentEvent = events.find(
+            (e) => now >= new Date(e.start) && now <= new Date(e.end)
+        );
+        if (currentEvent) {
+            AutoAV.Instance.setEventName(currentEvent.name);
+        } else {
+            AutoAV.Instance.setEventName('');
+        }
+        
+        // TODO: Handle ending the current event and starting the next if the computer is never rebooted
     });
 
     // Register a emitter listener for the hwping response.  Any time the hwping service updates, we'll send the updated list to the renderer
