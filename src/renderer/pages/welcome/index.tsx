@@ -4,9 +4,9 @@ import { Space } from 'antd';
 import Button from 'antd/es/button';
 import Typography from 'antd/es/typography';
 import { useNavigate } from 'react-router-dom';
+import { storeStep } from 'renderer/web_utils/step_manager';
 import Event from '../../../models/Event';
 import FiMLogo from '../../../../assets/fim_logo.png';
-import { storeStep } from 'renderer/web_utils/step_manager';
 
 function Welcome() {
     const nav = useNavigate();
