@@ -69,6 +69,9 @@ export default class Addons {
 
         // Start autoav
         this.AutoAV.start();
+
+        // Start hwping
+        this.HWPing.start();
     }
 
     // Manage the logs, removing old and moving old copies to a new folder

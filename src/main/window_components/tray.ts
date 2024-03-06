@@ -21,6 +21,9 @@ export default function buildTray(
     tooltip += 'AV Field IP: Unknown';
     tray.setToolTip(tooltip);
     tray.setContextMenu(contextMenu);
+    tray.addListener('click', () => {
+        mainWindow?.show();
+    });
 
     return tray;
 }

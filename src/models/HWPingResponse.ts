@@ -3,5 +3,6 @@ export default interface HWPingResponse {
     camera2: boolean;
     mixer: boolean;
     switch: boolean;
+    internet: boolean;
     errors: string[];
 }

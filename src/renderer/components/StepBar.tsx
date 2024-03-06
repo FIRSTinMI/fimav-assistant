@@ -3,6 +3,7 @@ import { Button, Col, Row } from 'antd';
 import { Steppable } from 'models/steppable';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { storeStep } from 'renderer/web_utils/step_manager';
 
 interface IProps extends Steppable {
     showNext?: boolean;
@@ -31,11 +32,13 @@ function StepBar({
             setLoading(true);
             const shouldAdvance = await beforeNext();
             if (shouldAdvance) {
+                storeStep(nextStep);
                 nav(`/step/${nextStep}`);
             } else {
                 setLoading(false);
             }
         } else {
+            storeStep(nextStep);
             nav(`/step/${nextStep}`);
         }
     };
@@ -56,8 +59,10 @@ function StepBar({
 
     const navBack = () => {
         if (previousStep < 1) {
+            storeStep(0);
             nav('/');
         } else {
+            storeStep(previousStep);
             nav(`/step/${previousStep}`);
         }
     };
@@ -113,7 +118,7 @@ StepBar.defaultProps = {
     nextDisabled: false,
     prevDisabled: false,
     beforeNext: undefined,
-    beforePrev: undefined
+    beforePrev: undefined,
 } as Partial<IProps>;
 
 export default StepBar;

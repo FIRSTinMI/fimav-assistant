@@ -2,6 +2,8 @@ import { HubConnection, HubConnectionBuilder } from '@microsoft/signalr';
 import log from 'electron-log';
 import Store from 'electron-store';
 import { AppConfig } from 'main/store';
+import { app } from 'electron';
+import { hostname } from 'os';
 import { SetPendingAlerts } from '../events/Alerts';
 import { signalrToElectronLog } from '../util';
 
@@ -53,6 +55,7 @@ export default function setupSignalR(
             .start()
             .then(() => {
                 log.info('Connection to SignalR established');
+                sendAppInfo();
                 return resolve();
             })
             .catch((err) => {
@@ -60,6 +63,16 @@ export default function setupSignalR(
                 return reject(err);
             });
     });
+}
+
+/*
+* Send the app version and hostname to the server
+*/
+function sendAppInfo() {
+    invoke('AppInfo', {
+        Version: app.getVersion(),
+        Hostname: hostname()
+    })
 }
 
 /*
@@ -103,6 +116,19 @@ function invoke(eventName: string, ...args: any[]): void {
 }
 
 /*
+* This function is used to invoke a SignalR event without waiting for a response.
+* @param eventName The name of the event to invoke
+* @param args Any arguments to pass to the event
+*/
+function invokeAsync(eventName: string, ...args: any[]): Promise<any> {
+    if (signalRConnection == null) return Promise.resolve();
+
+    return signalRConnection.invoke(eventName, ...args).catch((err) => {
+        log.error(`Failed to invoke '${eventName}'`, err);
+    });
+}
+
+/*
 * This function is used to register a listener for a SignalR event.
 * @param eventName The name of the event to listen for
 * @param listener The function to call when the event is received
@@ -126,4 +152,4 @@ function dismissAlert(id: string): void {
     });
 }
 
-export { dismissAlert, invokeExpectResponse, invoke, registerListener };
+export { dismissAlert, invokeExpectResponse, invoke, invokeAsync, registerListener };
