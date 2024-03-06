@@ -120,7 +120,7 @@ function InternetSetup({ nextStep, previousStep }: Steppable) {
                 previousStep={previousStep}
                 showNext
                 showPrev
-                nextDisabled={!cam1 || !cam2}
+                nextDisabled={!cam1 && !cam2}
             />
         </>
     );
