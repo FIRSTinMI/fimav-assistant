@@ -177,7 +177,7 @@ export default class AutoAV {
                     this.log('🚀 Scores Posted. Waiting 16 Seconds...');
 
                     // TODO: Make this time dynamic and configurable
-                    setTimeout(() => this.stopRecording(), 16000); // As of 2024, the time to actually see the match detailts happens at about 11 seconds, so we'll wait 16 seconds to be safe
+                    setTimeout(() => this.stopRecording(), 16000); // As of 2024, the time to actually see the match details happens at about 11 seconds, so we'll wait 16 seconds to be safe
                 }
             }
 
