@@ -54,11 +54,26 @@ export default function registerAllEvents(window: BrowserWindow | null) {
             const startDate = new Date(lastStart);
 
             // If today is Monday, and the start date is not today, reset the steps
-            const todayIsMonday = new Date().getDay() === 1;
+            const startDayOfWeek: number = startDate.getDay();
+
+            // Calculate the number of days needed to reach the next Monday
+            const daysUntilMonday =
+                startDayOfWeek === 1 ? 7 : (8 - startDayOfWeek) % 7;
+
+            // Create a new date object by adding the days until Monday to the startDate
+            const nextMonday = new Date(startDate);
+            nextMonday.setDate(startDate.getDate() + daysUntilMonday);
+            nextMonday.setHours(0, 0, 0, 0);
+
+            // Calculate if a Monday has passed since startDate
+            const mondayHasPassed: boolean =
+                new Date().getTime() > nextMonday.getTime();
+
+            // Calculate if the startDate is today (this should be redudnant, but it's here for safety)
             const startDateIsToday =
                 startDate.toDateString() === new Date().toDateString();
 
-            if (todayIsMonday && !startDateIsToday) {
+            if (mondayHasPassed && !startDateIsToday) {
                 store.set('stepsStartedAt', 0);
                 store.set('currentStep', 0);
                 stepToReply = 0;
@@ -91,7 +106,7 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         } else {
             AutoAV.Instance.setEventName('');
         }
-        
+
         // TODO: Handle ending the current event and starting the next if the computer is never rebooted
     });
 

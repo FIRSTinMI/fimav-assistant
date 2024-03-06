@@ -4,7 +4,7 @@ type VmixSettings = {
     password: string;
 };
 
-export default class VmixRecordingService {
+export default class VmixService {
     private settings: VmixSettings;
 
     /**
