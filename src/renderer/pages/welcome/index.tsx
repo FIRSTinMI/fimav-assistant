@@ -5,6 +5,7 @@ import Button from 'antd/es/button';
 import Typography from 'antd/es/typography';
 import { useNavigate } from 'react-router-dom';
 import { storeStep } from 'renderer/web_utils/step_manager';
+import StepManager from '../../components/StepManager';
 import Event from '../../../models/Event';
 import FiMLogo from '../../../../assets/fim_logo.png';
 
@@ -34,26 +35,29 @@ function Welcome() {
     };
 
     return (
-        <Space direction="vertical" style={{ textAlign: 'center' }}>
-            <img
-                className="logo-bounce"
-                src={FiMLogo}
-                style={{ width: '30%', height: '30%' }}
-                alt="FIRST in Michigan logo"
-            />
-            <Typography.Title level={1} style={{ marginTop: 0 }}>
-                Welcome!
-            </Typography.Title>
-            <Typography.Title level={5}>
-                Thank you for signing up to volunteer as AV for{' '}
-                {currentEvent?.name ?? 'FIRST in Michigan'}
-            </Typography.Title>
+        <>
+            <StepManager />
+            <Space direction="vertical" style={{ textAlign: 'center' }}>
+                <img
+                    className="logo-bounce"
+                    src={FiMLogo}
+                    style={{ width: '30%', height: '30%' }}
+                    alt="FIRST in Michigan logo"
+                />
+                <Typography.Title level={1} style={{ marginTop: 0 }}>
+                    Welcome!
+                </Typography.Title>
+                <Typography.Title level={5}>
+                    Thank you for signing up to volunteer as AV for{' '}
+                    {currentEvent?.name ?? 'FIRST in Michigan'}
+                </Typography.Title>
 
-            <Button type="primary" size="large" onClick={handleNext}>
-                Let&apos;s Get Started{' '}
-                <RightOutlined className="btn-icon-bounce" />
-            </Button>
-        </Space>
+                <Button type="primary" size="large" onClick={handleNext}>
+                    Let&apos;s Get Started{' '}
+                    <RightOutlined className="btn-icon-bounce" />
+                </Button>
+            </Space>
+        </>
     );
 }
 
