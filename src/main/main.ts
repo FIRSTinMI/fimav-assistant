@@ -94,13 +94,13 @@ const createWindow = async () => {
 
     mainWindow.on('minimize', (event: any) => {
         event.preventDefault();
-        mainWindow?.hide();
+        mainWindow?.minimize();
     });
 
     mainWindow.on('close', (event) => {
         if (!appIsQuitting) {
             event.preventDefault();
-            mainWindow?.hide();
+            mainWindow?.minimize();
             return false;
         }
         mainWindow?.destroy();
