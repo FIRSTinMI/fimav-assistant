@@ -141,7 +141,7 @@ export default class LiveCaptions {
             }
 
             // Start the live-captions process
-            this.process = spawn(exePath, [], { shell: true });
+            this.process = spawn(exePath, ['--skip-update-check'], { shell: true });
 
             // Log the stdout and stderr to files
             this.process.stdout.on('data', (data) => {
