@@ -56,16 +56,17 @@ export default class HWPing {
     }
 
     // Ping the hardware
+    // TODO: make these dynamic?
     private async ping() {
         const promises = [
             // Ping switch
             ping.promise.probe(`192.168.25.10${this.cartNumber}`, pingConfig),
-            // Ping mixer
-            ping.promise.probe(`192.168.25.${this.cartNumber}2`, pingConfig),
             // Ping PTZ1
-            ping.promise.probe(`192.168.25.${this.cartNumber}3`, pingConfig),
+            ping.promise.probe(`192.168.25.${this.cartNumber}1`, pingConfig),
             // Ping PTZ2
-            ping.promise.probe(`192.168.25.${this.cartNumber}4`, pingConfig),
+            ping.promise.probe(`192.168.25.${this.cartNumber}2`, pingConfig),
+            // Ping mixer
+            ping.promise.probe(`192.168.25.${this.cartNumber}3`, pingConfig),
             // Ping Internet
             ping.promise.probe('docs.fimav.us', pingConfig),
         ];
