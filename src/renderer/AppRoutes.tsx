@@ -32,11 +32,11 @@ function AppRoutes() {
                 />
                 <Route
                     path="/step/3"
-                    element={<CameraSetup nextStep={0} previousStep={2} />}
+                    element={<CameraSetup nextStep={4} previousStep={2} />}
                 />
                 <Route
                     path="/step/4"
-                    element={<FallbackToDocs nextStep={0} previousStep={3} />}
+                    element={<FallbackToDocs nextStep={4} previousStep={3} />}
                 />
             </Routes>
         </Router>
