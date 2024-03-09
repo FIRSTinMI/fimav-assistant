@@ -26,8 +26,8 @@ export default async function attemptRename(
                 matchStatus.PlayNumber > 1 ? ` (Play #${matchStatus.PlayNumber})` : '';
             const newFileName = `${eventName} - ${matchStatus.Level} Match ${matchStatus.MatchNumber}${playString}.mp4`;
 
-            // Check if event name folder exists
-            const eventFolder = path.resolve(videoLocation, eventName);
+            // Check if event name folder exists (videoLocation has the file name at the end, so we must "go up" one directory)
+            const eventFolder = path.resolve(videoLocation, "../", eventName);
             if (!fs.existsSync(eventFolder)) {
                 fs.mkdirSync(eventFolder);
             }
