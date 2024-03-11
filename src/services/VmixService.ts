@@ -59,9 +59,11 @@ export default class VmixService {
         log.info('Setting stream info')
 
         const streamInfo: StreamInfo[] = await invokeExpectResponse('GetStreamInfo', 'StreamInfo');
+        log.info(streamInfo);
 
         const setStreamInfo = async (info: StreamInfo): Promise<void> => {
-            if (!info.rtmpUrl || !info.rtmpKey) return;
+            info.rtmpUrl ??= '';
+            info.rtmpKey ??= '';
 
             await fetch(`${this.settings.baseUrl}?Function=StreamingSetURL&Value=${info.index},${info.rtmpUrl}`, {
                 headers: this.createHeaders(),
@@ -71,7 +73,11 @@ export default class VmixService {
             });
         }
 
-        await Promise.all(streamInfo.map(setStreamInfo));
+        await Promise.all([0, 1, 2].map(idx => setStreamInfo(streamInfo.find(info => info.index === idx) ?? {
+            index: idx,
+            rtmpUrl: '',
+            rtmpKey: ''
+        })));
     }
 
     async AddBrowserInput(url: string): Promise<void> {
