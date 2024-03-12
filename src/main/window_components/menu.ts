@@ -92,12 +92,6 @@ export default class MenuBuilder {
                             label: 'Live Captions',
                             submenu: [
                                 {
-                                    label: 'Add input to vMix',
-                                    click() {
-                                        MenuBuilder.addLiveCapInput();
-                                    },
-                                },
-                                {
                                     label: 'Restart',
                                     click() {
                                         that.addons.restartLiveCaptions();
@@ -159,6 +153,12 @@ export default class MenuBuilder {
                                         type: 'info'
                                     });
                                 }
+                            },
+                        },
+                        {
+                            label: 'Add Live Captions input',
+                            click() {
+                                MenuBuilder.addLiveCapInput();
                             },
                         },
                     ],
