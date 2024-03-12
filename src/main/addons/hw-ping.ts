@@ -83,38 +83,38 @@ export default class HWPing {
         let didUpdate = false;
         results.forEach((res, i) => {
             switch (i) {
-                case 0:
-                    if (this.currentState.switch !== res.alive) {
-                        this.currentState.switch = res.alive;
-                        didUpdate = true;
-                    }
-                    break;
-                case 1:
-                    if (this.currentState.mixer !== res.alive) {
-                        this.currentState.mixer = res.alive;
-                        didUpdate = true;
-                    }
-                    break;
-                case 2:
-                    if (this.currentState.camera1 !== res.alive) {
-                        this.currentState.camera1 = res.alive;
-                        didUpdate = true;
-                    }
-                    break;
-                case 3:
-                    if (this.currentState.camera2 !== res.alive) {
-                        this.currentState.camera2 = res.alive;
-                        didUpdate = true;
-                    }
-                    break;
-                case 4:
-                    if (this.currentState.internet !== res.alive) {
-                        this.currentState.internet = res.alive;
-                        didUpdate = true;
-                    }
-                    break;
-                default:
-                    break;
+            case 0:
+                if (this.currentState.switch !== res.alive) {
+                    this.currentState.switch = res.alive;
+                    didUpdate = true;
+                }
+                break;
+            case 1:
+                if (this.currentState.mixer !== res.alive) {
+                    this.currentState.mixer = res.alive;
+                    didUpdate = true;
+                }
+                break;
+            case 2:
+                if (this.currentState.camera1 !== res.alive) {
+                    this.currentState.camera1 = res.alive;
+                    didUpdate = true;
+                }
+                break;
+            case 3:
+                if (this.currentState.camera2 !== res.alive) {
+                    this.currentState.camera2 = res.alive;
+                    didUpdate = true;
+                }
+                break;
+            case 4:
+                if (this.currentState.internet !== res.alive) {
+                    this.currentState.internet = res.alive;
+                    didUpdate = true;
+                }
+                break;
+            default:
+                break;
             }
         });
 

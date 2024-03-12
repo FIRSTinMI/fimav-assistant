@@ -7,6 +7,11 @@ export type AppConfig = {
     runOnStartup: boolean;
     currentStep: number;
     stepsStartedAt: number;
+    vmixApi: {
+        baseUrl: string;
+        username: string;
+        password: string
+    };
 };
 
 export function createStore(): Store<AppConfig> {
@@ -36,6 +41,23 @@ export function createStore(): Store<AppConfig> {
                 type: 'number',
                 default: 0,
             },
+            vmixApi: {
+                type: 'object',
+                properties: {
+                    baseUrl: {
+                        type: 'string',
+                        default: 'http://127.0.0.1:8000/api'
+                    },
+                    username: {
+                        type: 'string',
+                        default: 'user'
+                    },
+                    password: {
+                        type: 'string',
+                        default: 'pass'
+                    }
+                }
+            }
         },
         migrations: {
             '0.0.4': (store) => {
@@ -52,6 +74,13 @@ export function createStore(): Store<AppConfig> {
                 store.set('currentStep', 0);
                 store.set('stepsStartedAt', 0);
             },
+            '0.0.17': (store) => {
+                store.set('vmixApi', {
+                    baseUrl: 'http://127.0.0.1:8000/api',
+                    username: 'user',
+                    password: 'pass'
+                });
+            }
         },
     }) as Store<AppConfig>;
 }

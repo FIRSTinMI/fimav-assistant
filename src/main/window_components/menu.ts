@@ -4,6 +4,7 @@ import {
     shell,
     BrowserWindow,
     MenuItemConstructorOptions,
+    dialog
 } from 'electron';
 import Addons from 'main/addons';
 import { platform } from 'os';
@@ -91,12 +92,6 @@ export default class MenuBuilder {
                             label: 'Live Captions',
                             submenu: [
                                 {
-                                    label: 'Add input to vMix',
-                                    click() {
-                                        MenuBuilder.addLiveCapInput();
-                                    },
-                                },
-                                {
                                     label: 'Restart',
                                     click() {
                                         that.addons.restartLiveCaptions();
@@ -133,6 +128,37 @@ export default class MenuBuilder {
                             label: 'Restart All',
                             click() {
                                 that.addons.restartAll();
+                            },
+                        },
+                    ],
+                },
+                {
+                    label: 'vMix',
+                    submenu: [
+                        {
+                            label: 'Set Stream Keys',
+                            click: async () => {
+                                try {
+                                    const service = new VmixService();
+                                    await service.SetStreamInfo();
+                                    dialog.showMessageBox({
+                                        message: 'Successfully set vMix streaming locations',
+                                        title: 'vMix Streaming',
+                                        type: 'info'
+                                    });
+                                } catch (e: any) {
+                                    dialog.showMessageBox({
+                                        message: `Failed to set streaming locations: ${e.toString()}`,
+                                        title: 'vMix Streaming',
+                                        type: 'info'
+                                    });
+                                }
+                            },
+                        },
+                        {
+                            label: 'Add Live Captions input',
+                            click() {
+                                MenuBuilder.addLiveCapInput();
                             },
                         },
                     ],
@@ -218,11 +244,7 @@ export default class MenuBuilder {
     }
 
     static async addLiveCapInput() {
-        const service = new VmixService({
-            baseUrl: 'http://127.0.0.1:8000/api',
-            username: 'user',
-            password: 'pass',
-        });
+        const service = new VmixService();
 
         try {
             // Add input to vMix

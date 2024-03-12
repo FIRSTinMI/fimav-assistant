@@ -1,3 +1,7 @@
+import log from 'electron-log';
+import { invokeExpectResponse } from "../main/window_components/signalR";
+import { getStore } from "../main/store";
+
 type VmixSettings = {
     baseUrl: string;
     username: string;
@@ -10,8 +14,12 @@ export default class VmixService {
     /**
      *
      */
-    constructor(settings: VmixSettings) {
-        this.settings = settings;
+    constructor(settings?: VmixSettings) {
+        if (settings) {
+            this.settings = settings;
+        } else {
+            this.settings = getStore().get('vmixApi');
+        }
     }
 
     updateSettings(settings: VmixSettings): void {
@@ -39,6 +47,37 @@ export default class VmixService {
         await fetch(`${this.settings.baseUrl}?Function=StopRecording`, {
             headers: this.createHeaders(),
         });
+    }
+
+    async SetStreamInfo(): Promise<void> {
+        type StreamInfo = {
+            index: number,
+            rtmpUrl: string,
+            rtmpKey: string
+        }
+
+        log.info('Setting stream info')
+
+        const streamInfo: StreamInfo[] = await invokeExpectResponse('GetStreamInfo', 'StreamInfo');
+        log.info(streamInfo);
+
+        const setStreamInfo = async (info: StreamInfo): Promise<void> => {
+            info.rtmpUrl ??= '';
+            info.rtmpKey ??= '';
+
+            await fetch(`${this.settings.baseUrl}?Function=StreamingSetURL&Value=${info.index},${info.rtmpUrl}`, {
+                headers: this.createHeaders(),
+            });
+            await fetch(`${this.settings.baseUrl}?Function=StreamingSetKey&Value=${info.index},${info.rtmpKey}`, {
+                headers: this.createHeaders(),
+            });
+        }
+
+        await Promise.all([0, 1, 2].map(idx => setStreamInfo(streamInfo.find(info => info.index === idx) ?? {
+            index: idx,
+            rtmpUrl: '',
+            rtmpKey: ''
+        })));
     }
 
     async AddBrowserInput(url: string): Promise<void> {

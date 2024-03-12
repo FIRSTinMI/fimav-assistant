@@ -96,11 +96,7 @@ export default class AutoAV {
         this.log('AutoAV Service Started');
 
         // Create new VMix Service
-        this.vmixService = new VmixRecordingService({
-            baseUrl: 'http://127.0.0.1:8000/api',
-            username: 'user',
-            password: 'pass',
-        });
+        this.vmixService = new VmixRecordingService();
 
         // Build a connection to the SignalR Hub
         this.hubConnection = new HubConnectionBuilder()
