@@ -25,17 +25,4 @@ type SoundVolumeViewOutput = {
     'Speakers Config': string;
 };
 
-export type ParsedSoundOutput = {
-    name: string;
-    sub_name: string;
-    id: string | number;
-    type: string;
-    device_type: 'Capture' | 'Render' | 'Application';
-    volume_percent: string;
-    default: 'Render' | 'Capture' | '';
-    muted: boolean;
-    control_id: string;
-    registry_key: string;
-};
-
 export default SoundVolumeViewOutput;
