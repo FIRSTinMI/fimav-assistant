@@ -113,7 +113,15 @@ export default class AutoAV {
                 },
             })
             // .withHubProtocol(new MessagePackHubProtocol())
-            .withAutomaticReconnect()
+            .withAutomaticReconnect({
+                nextRetryDelayInMilliseconds(retryContext) {
+                    log.warn('Retrying SignalR connection...');
+                    return Math.min(
+                        2_000 * retryContext.previousRetryCount,
+                        120_000
+                    );
+                },
+            })
             .build();
 
         // Register listener for the "MatchStatusInfoChanged" event (match starts, ends, changes modes, etc)
