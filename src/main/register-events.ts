@@ -1,7 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import log from 'electron-log';
 import HWPingResponse from 'models/HWPingResponse';
-import HWCheck from './events/HWCheck';
+import HWCheck, { enableDhcp } from './events/HWCheck';
 import Alerts from './events/Alerts';
 import {
     dismissAlert,
@@ -13,6 +13,7 @@ import HWPing from './addons/hw-ping';
 import { getStore } from './store';
 import Event from '../models/Event';
 import AutoAV from './addons/autoav';
+import { StaticIpInfo } from '../models/HWCheckResponse';
 
 // Use this file to register all events. For uniformity, all events should send their response as <event-name>-response
 
@@ -113,6 +114,10 @@ export default function registerAllEvents(window: BrowserWindow | null) {
     // Register a emitter listener for the hwping response.  Any time the hwping service updates, we'll send the updated list to the renderer
     HWPing.Instance.on('hw-change', (res: HWPingResponse) => {
         window?.webContents.send('hw-change', res);
+    });
+
+    ipcMain.on('set-venue-ip-dhcp', async (event, info: StaticIpInfo[]) => {
+        event.reply('set-venue-ip-dhcp-response', await enableDhcp(info[0].interface));
     });
 
     ipcMain.on('alerts:getAlerts', (event) => {
