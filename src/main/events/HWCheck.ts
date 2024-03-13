@@ -1,11 +1,12 @@
-import { exec, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import electronLog, { LogFunctions } from 'electron-log';
 import { NetAdapterModel } from 'models/AdvancedAdapterInfo';
 import HWCheckResponse from 'models/HWCheckResponse';
-import SoundVolumeViewOutput from 'models/SoundVolumeViewOutput';
+import SoundVolumeViewOutput, { ParsedSoundOutput } from 'models/SoundVolumeViewOutput';
 import { networkInterfaces, hostname, NetworkInterfaceInfo } from 'os';
 import path from 'path';
 import ping from 'ping';
+import { elevatedPSCommand, psCommand } from '../util';
 
 const SoundVolumeViewPath =
     process.env.NODE_ENV === 'production'
@@ -44,6 +45,11 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
             ptz1: false,
             ptz2: false,
         },
+        static_venue_ip: {
+            static: false,
+            ip: '',
+            interface: '',
+        },
     };
 
     if (process.platform !== 'win32') {
@@ -69,6 +75,7 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     // Get Network Interfaces
     const interfaces = networkInterfaces();
     const advancedInterfaces = await advancedNetworkInterfaces(log);
+    const staticInfo = await getIntefaceStaticInfo(log); // this takes a hot sec
     let vlan10: NetworkInterfaceInfo[] | undefined;
     let vlan10Name: string | undefined;
     let vlan20: NetworkInterfaceInfo[] | undefined;
@@ -119,20 +126,21 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
             'Could not find all required network interfaces. Please contact FIMAV Support'
         );
 
-    // Enable DHCP on venue NIC
-    if (vlan10 && vlan10Name)
-        await enableDhcp(vlan10Name)
-            .then(() => {
-                resp.logs.push('Enabled DHCP on Venue VLAN');
-                return undefined;
-            })
-            .catch((err) => {
-                log.error('Could not enable DHCP on Venue VLAN: ', err);
-                resp.errors.push('Failed to enable DHCP on Venue VLAN');
-            });
+    // Check if Venue Vlan has a static IP
+    if (vlan10 && vlan10Name) {
+        // If no DHCP
+        if (staticInfo[vlan10Name] === false) {
+            resp.static_venue_ip = {
+                static: true,
+                ip: vlan10.find((i) => i.family === 'IPv4')?.address || 'Unknown',
+                interface: vlan10Name,
+            }
+        }
+    }
 
     // Enable DHCP on field NIC
     if (vlan20 && vlan20Name)
+        // VLAN 20 should ALWAYS be the field network and ALWAYS be DHCP
         await enableDhcp(vlan20Name)
             .then(() => {
                 resp.logs.push('Enabled DHCP on Field VLAN');
@@ -307,6 +315,9 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
         }
     }
 
+    // Set sound scheme to none
+    await psCommand('New-ItemProperty -Path HKCU:\\AppEvents\\Schemes -Name "(Default)" -Value ".None" -Force | Out-Null');
+
     const keysToExclude = ['id', 'registry_key'];
 
     resp.audio_devices_found.map((device: any) =>
@@ -320,118 +331,115 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     return resp;
 }
 
-async function enableDhcp(interfaceName: string): Promise<boolean> {
-    return new Promise(resolve => {
-        resolve(!!interfaceName)
-    });
-    // return new Promise((resolve, reject) => {
-    //     // Run netsh interface ipv4 set address name="Ethernet" static
-    //     resolve(true);
-    //     const proc = spawn('netsh', [
-    //         'interface',
-    //         'ipv4',
-    //         'set',
-    //         'address',
-    //         `name="${interfaceName}"`,
-    //         'dhcp',
-    //     ]);
+/**
+ * Set the IP and DNS of a network interface to DHCP
+ * @param interfaceName Interface name to enable DHCP for
+ * @returns true if successful, false if not
+ */
+export function enableDhcp(interfaceName: string): Promise<boolean> {
+    const dhcpIpCmd = `netsh interface ipv4 set address name="${interfaceName}" dhcp`;
+    const dhcpDnsCmd = `netsh interface ipv4 set dnsservers name="${interfaceName}" dhcp`;
+    return elevatedPSCommand(`${dhcpIpCmd}; ${dhcpDnsCmd};`).then(() => true).catch(() => false);
+}
 
-    //     // Listen for exit
-    //     proc.on('exit', () => {
-    //         resolve(true);
-    //     });
+/**
+ * Set a static ip on an interface
+ * @param interfaceName Interface name to enable DHCP for
+ * @returns true if successful, false if not
+ */
+export function setStaticIp(interfaceName: string, ip: string, subnet: string, gateway: string): Promise<boolean> {
+    const dhcpIpCmd = `netsh interface ipv4 set address name="${interfaceName}" static ${ip} ${subnet} ${gateway}`;
+    return elevatedPSCommand(`${dhcpIpCmd}`).then(() => true).catch(() => false);
+}
 
-    //     // Listen for error
-    //     proc.on('error', (err) => {
-    //         reject(err);
-    //     });
-    // });
+/**
+ * Set static dns on an interface
+ * @param interfaceName Interface name to enable DHCP for
+ * @returns true if successful, false if not
+ */
+export function setStaticDns(interfaceName: string, primary: string): Promise<boolean> {
+    const dhcpIpCmd = `netsh interface ipv4 set dnsservers name="${interfaceName}" static ${primary} primary`;
+    return elevatedPSCommand(`${dhcpIpCmd}`).then(() => true).catch(() => false);
 }
 
 // Get advanced network interface info
 // See the output in assets/sample_payloads/ExampleNetworkOutput.json for some example data
-async function advancedNetworkInterfaces(log: LogFunctions): Promise<NetAdapterModel> {
-    return new Promise((resolve, reject) => {
-        // Fun commands
-        exec('powershell "Get-NetAdapterAdvancedProperty -Name \\"*\\" -AllProperties  | Format-List -Property \\"*"\\"', (error, stdout, stderr) => {
-            if (error) {
-                log.error(`Error executing command: ${error.message}`);
-                reject();
-                return;
+function advancedNetworkInterfaces(log: LogFunctions): Promise<NetAdapterModel> {
+    return psCommand('Get-NetAdapterAdvancedProperty -Name "*" -AllProperties | Format-List -Property "*"').then((stdout) => {
+        // Parse the output into a JavaScript object
+        const objs: any[] = [];
+        let index = 0;
+
+        // Split on new line and loop
+        stdout.split('\n').forEach(line => {
+            // Create object if doesn't exist
+            if (!objs[index]) objs[index] = {};
+
+            // Split on colon, trim whitespace
+            const [name, value] = line.split(':').map(part => part.trim());
+
+            // Empty line is new adapter
+            if (name === '') {
+                index += 1;
+            } else {
+                objs[index][name] = value;
             }
-            if (stderr) {
-                log.error(`Command stderr: ${stderr}`);
-                reject()
-                return;
-            }
-
-            // Parse the output into a JavaScript object
-            const objs: any[] = [];
-            let index = 0;
-
-            // Split on new line and loop
-            stdout.split('\n').forEach(line => {
-                // Create object if doesn't exist
-                if (!objs[index]) objs[index] = {};
-
-                // Split on colon, trim whitespace
-                const [name, value] = line.split(':').map(part => part.trim());
-
-                // Empty line is new adapter
-                if (name === '') {
-                    index += 1;
-                } else {
-                    objs[index][name] = value;
-                }
-            });
-
-            // Convert to object key'd by "Name"
-            const byNames: any = {};
-            objs.forEach(obj => {
-                if (!byNames[obj.Name]) byNames[obj.Name] = {};
-                byNames[obj.Name][obj.ValueName] = obj.ValueData;
-            });
-            resolve(byNames);
         });
+
+        // Convert to object key'd by "Name"
+        const byNames: any = {};
+        objs.forEach(obj => {
+            if (!byNames[obj.Name]) byNames[obj.Name] = {};
+            byNames[obj.Name][obj.ValueName] = obj.ValueData;
+        });
+
+        return byNames;
+    }).catch((err) => {
+        log.error('Could not get advanced network interface info: ', err);
+        return {};
     });
 }
 
-/*
-* Set a static IP on a network interface
-*   interfaceName: The name of the interface to set the IP on
-*   ip: The IP address to set
-*   subnet: The subnet mask to set
-*   gateway: The gateway to set
-*/
-async function setStaticIp(
-    interfaceName: string,
-    ip: string,
-    subnet: string,
-    gateway: string
-): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-        // Run netsh interface ipv4 set address name="Ethernet" static
-        const proc = spawn('netsh', [
-            'interface',
-            'ipv4',
-            'set',
-            'address',
-            `name="${interfaceName}"`,
-            'static',
-            ip,
-            subnet,
-            gateway,
-        ]);
 
-        // Listen for exit
-        proc.on('exit', () => {
-            resolve(true);
+/**
+ * Check if the interface is static or DHCP
+ * @returns Interface => static IP
+ */
+function getIntefaceStaticInfo(log: LogFunctions): Promise<{ [key: string]: boolean }> {
+    return psCommand('$IpConfig = Get-NetIPConfiguration; Get-NetIPInterface -ifindex $IpConfig.InterfaceIndex | select ifIndex,ifAlias,Dhcp, AddressFamily').then((stdout) => {
+        // Split the output into lines and remove any leading/trailing whitespace
+        const lines = stdout.trim().split('\n').slice(3); // Exclude header
+
+        // Parse each line and construct JSON object
+        const parsedData = lines.map((line: string) => {
+            // Parse the line
+            const match = line.trim().match(/^(\d+)\s(.+?)\s+(Enabled|Disabled)\s+(\w+)$/);
+            // If no match, return null
+            if (!match) return null;
+            // Destructure the match
+            const [, ifIndex, ifAlias, Dhcp, AddressFamily] = match;
+            // Return the object
+            return {
+                ifIndex: parseInt(ifIndex.trim(), 10),
+                ifAlias: ifAlias.trim(),
+                dhcp: Dhcp.trim() === 'Enabled',
+                AddressFamily: AddressFamily?.trim()
+            };
+        }).filter((data: any) => data !== null);
+
+        // Filter out IPv6 addresses
+        const ipv4Data = parsedData.filter((data: any) => data.AddressFamily === 'IPv4');
+
+        // Map to object keyed by ifAlias
+        const byAlias: { [key: string]: boolean } = {};
+        ipv4Data.forEach((data: any) => {
+            byAlias[data.ifAlias] = data.dhcp;
         });
 
-        // Listen for error
-        proc.on('error', (err) => {
-            reject(err);
-        });
+        return byAlias;
+    }).catch((err) => {
+        log.error('Could not get interface static info: ', err);
+        return {};
     });
 }
 
@@ -439,12 +447,12 @@ async function setStaticIp(
 * Fetch and parse audio devices
 *   log: Electron log instance
 */
-async function fetchAndParseAudioDevices(log: LogFunctions): Promise<SoundVolumeViewOutput[]> {
+export async function fetchAndParseAudioDevices(log: LogFunctions): Promise<ParsedSoundOutput[]> {
     // Fetch Devices
     const devices = await getAudioDevices(log);
 
     // Parse them to pretty
-    const parsed = devices.map((a) => ({
+    const parsed: any[] = devices.map((a) => ({
         name: a.Name,
         sub_name: a['Device Name'],
         id: a['Item ID'],
@@ -458,7 +466,7 @@ async function fetchAndParseAudioDevices(log: LogFunctions): Promise<SoundVolume
     }));
 
     // Return
-    return parsed as any[];
+    return parsed;
 }
 
 /*
@@ -517,7 +525,7 @@ async function getAudioDevices(log: LogFunctions): Promise<SoundVolumeViewOutput
 *   deviceCmdName: The command line friendly ID of the device
 *   percent: The percent to set the volume to (0-100)
 */
-async function setVolumePercent(
+export async function setVolumePercent(
     deviceCmdName: string,
     percent: number
 ): Promise<boolean> {
@@ -528,7 +536,15 @@ async function setVolumePercent(
 * Unmute a device
 *   deviceCmdName: The command line friendly ID of the device
 */
-async function unmuteDevice(deviceCmdName: string): Promise<boolean> {
+export async function unmuteDevice(deviceCmdName: string): Promise<boolean> {
+    return runSetSoundCommand('/Unmute', deviceCmdName);
+}
+
+/*
+* Mute a device
+*   deviceCmdName: The command line friendly ID of the device
+*/
+export async function muteDevice(deviceCmdName: string): Promise<boolean> {
     return runSetSoundCommand('/Unmute', deviceCmdName);
 }
 
@@ -537,7 +553,7 @@ async function unmuteDevice(deviceCmdName: string): Promise<boolean> {
 *   deviceCmdName: The command line friendly ID of the device
 *   type: The type of device to set as default
 */
-async function setDefaultAudioDevice(
+export async function setDefaultAudioDevice(
     deviceCmdName: string,
     type: 'Console' | 'Multimedia' | 'Communications' | 'all'
 ): Promise<boolean> {
