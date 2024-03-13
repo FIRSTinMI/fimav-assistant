@@ -1,5 +1,5 @@
-import { Col, Modal, Row, Space, Typography } from 'antd';
-import HWCheckResponse, { StaticIpInfo } from 'models/HWCheckResponse';
+import { Col, Row, Space, Typography } from 'antd';
+import HWCheckResponse from 'models/HWCheckResponse';
 import { Steppable } from 'models/steppable';
 import { useEffect, useState } from 'react';
 import StepBar from 'renderer/components/StepBar';
@@ -13,17 +13,12 @@ function HWCheck({ nextStep, previousStep }: Steppable) {
     const [audioReady, setAudioReady] = useState(ReadyState.NotReady);
     const [errors, setErrors] = useState<string[]>([]);
     const [ready, setReady] = useState<boolean>(false);
-    const [modal, contextHolder] = Modal.useModal();
 
     useEffect(() => {
         // Fire off HW check and register listener
         window.electron.ipcRenderer.once<HWCheckResponse>(
             'hwcheck-response',
-            async (arg: HWCheckResponse) => {
-                if (arg.static_venue_ip.static) {
-                    await promptStaticIp(false, arg.static_venue_ip);
-                }
-
+            (arg: HWCheckResponse) => {
                 setNetworkReady(
                     arg.av_ip_ready && arg.field_ip_ready && arg.venue_ip_ready
                         ? ReadyState.Ready
@@ -42,48 +37,10 @@ function HWCheck({ nextStep, previousStep }: Steppable) {
             }
         );
         window.electron.ipcRenderer.sendMessage('hwcheck', []);
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-    const promptStaticIp = (failPrev: boolean, staticVenueIp: StaticIpInfo) => {
-        return modal.confirm({
-            title: 'Static IP Detected',
-            cancelText: 'Leave It',
-            okText: 'Enable DHCP (Recommended)',
-            closable: false,
-            keyboard: false,
-            content: (
-                <Space direction="vertical">
-                    {failPrev && (
-                        <Typography.Text type="danger">
-                            The previous attempt to enable DHCP failed.  Please be sure to click &quot;Yes&quot; on the Windows popup that appears.
-                        </Typography.Text>
-                    )}
-                    <Typography.Text>
-                        Your IP address is set to a static address of <code>{staticVenueIp.ip}</code>.
-                        If this is intentional, please click &quot;Leave It&quot; to continue.  Otherwise,
-                        click &quot;Enable DHCP&quot; to allow the system to configure the network
-                        adapter to use DHCP.
-                    </Typography.Text>
-                </Space>
-            ),
-            onOk: async () => {
-                window.electron.ipcRenderer.sendMessage('set-venue-ip-dhcp', [staticVenueIp]);
-                return new Promise<void>((resolve) => {
-                    window.electron.ipcRenderer.once('set-venue-ip-dhcp-response', (success) => {
-                        resolve();
-                        if (!success) {
-                            promptStaticIp(true, staticVenueIp);
-                        }
-                    });
-                });;
-            },
-        });
-    }
+    }, []); // only run once
 
     return (
         <>
-            {/* Modal for errors */}
-            {contextHolder}
             <Space
                 direction="vertical"
                 style={{ textAlign: 'center', width: '100%' }}

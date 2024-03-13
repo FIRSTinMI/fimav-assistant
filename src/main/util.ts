@@ -5,7 +5,6 @@ import { app } from 'electron';
 import { LogFunctions } from 'electron-log';
 import { LogLevel } from '@microsoft/signalr';
 import { hostname } from 'os';
-import { exec } from 'child_process';
 
 export function resolveHtmlPath(
     htmlFileName: string,
@@ -85,18 +84,3 @@ export const isDebug = () => process.env.NODE_ENV === 'development' || process.e
 
 export const appdataPath = app.getPath('userData');
 export const logsPath = app.getPath('logs');
-
-
-export const elevatedPSCommand = (command: string): Promise<string> => {
-    return new Promise((resolve, reject) => {
-        exec(`powershell -Command "& {Start-Process powershell -windowstyle hidden -Verb RunAs -ArgumentList '-Command ${command}'}"`, (error: any, stdout: any, stderr: any) => {
-            if (error) {
-                reject(error);
-            }
-            if (stderr) {
-                reject(stderr);
-            }
-            resolve(stdout);
-        });
-    });
-}

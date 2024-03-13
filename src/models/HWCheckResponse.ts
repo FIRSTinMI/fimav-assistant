@@ -16,13 +16,6 @@ export default interface HWCheckResponse {
         ptz1: boolean;
         ptz2: boolean;
     };
-    static_venue_ip: StaticIpInfo;
-}
-
-export interface StaticIpInfo {
-    static: boolean;
-    ip: string;
-    interface: string;
 }
 
 export interface AudioDeviceStatus {
