@@ -100,3 +100,17 @@ export const elevatedPSCommand = (command: string): Promise<string> => {
         });
     });
 }
+
+export const psCommand = (command: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        exec(`powershell -Command "${command.replaceAll('"', '\\"')}"`, (error: any, stdout: any, stderr: any) => {
+            if (error) {
+                reject(error);
+            }
+            if (stderr) {
+                reject(stderr);
+            }
+            resolve(stdout);
+        });
+    });
+}
