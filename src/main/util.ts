@@ -89,7 +89,7 @@ export const logsPath = app.getPath('logs');
 
 export const elevatedPSCommand = (command: string): Promise<string> => {
     return new Promise((resolve, reject) => {
-        exec(`powershell -Command "& {Start-Process powershell -windowstyle hidden -Verb RunAs -ArgumentList '-Command ${command}'}"`, (error: any, stdout: any, stderr: any) => {
+        exec(`powershell -Command "& {Start-Process powershell -windowstyle hidden -Verb RunAs -ArgumentList '-Command ${command.replaceAll('"', '\\"')}'}"`, (error: any, stdout: any, stderr: any) => {
             if (error) {
                 reject(error);
             }
