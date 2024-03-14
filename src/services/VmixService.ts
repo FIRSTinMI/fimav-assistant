@@ -73,7 +73,9 @@ export default class VmixService {
             });
         }
 
-        for (let idx = 0; idx < 3; idx++) {
+        for (let idx = 0; idx < 3; idx += 1) {
+            // We want to explicitly run these operations in order, we cannot make use of parallelization
+            // eslint-disable-next-line no-await-in-loop
             await setStreamInfo(streamInfo.find(info => info.index === idx) ?? {
                 index: idx,
                 rtmpUrl: '',
