@@ -28,6 +28,12 @@ export default class AutoAV {
     // Current event name
     private currentEventName: string | null = null;
 
+    // Track whether or not we're recording (rather than someone in vMix clicking record)
+    private weAreRecording = false;
+
+    // Track if we're already scheduled to stop recording
+    private willStopRecording = false;
+
     constructor() {
         // Start new log files
         this.logs = {
@@ -50,6 +56,8 @@ export default class AutoAV {
         VmixService.Instance.StopRecording()
             .then(async () => {
                 this.log('🟥 Stopped Recording');
+                this.weAreRecording = false;
+                this.willStopRecording = false;
 
                 // If we don't have a start time or data, don't try to rename
                 if (!this.lastMatchStartData) return undefined;
@@ -108,6 +116,7 @@ export default class AutoAV {
             .then(() => {
                 this.log('🔴 Started Recording');
                 this.lastMatchStartData = matchInfo;
+                this.weAreRecording = true;
 
                 // Give it some time, then attempt to find the file
                 setTimeout(async () => {
@@ -174,7 +183,20 @@ export default class AutoAV {
                     this.startRecording(info);
                 } else if (info.MatchState === 'MatchCancelled') {
                     // Estop!
+                    this.willStopRecording = true;
                     setTimeout(() => this.stopRecording(), 10000); // Ok, but we wanna see the frantic running around for a bit
+                } else if (
+                    [
+                        'Prestarting',
+                        'PrestartingTO',
+                        'WaitingForPrestart',
+                        'WaitingForPrestartTO',
+                    ].includes(info.MatchState) &&
+                    !this.willStopRecording // Don't stop recording if we're already stopping
+                ) {
+                    // Probably skipped showing results.  Stop recording as results won't be shown
+                    this.willStopRecording = true;
+                    setTimeout(() => this.stopRecording(), 10000);
                 }
             }
         );
@@ -196,6 +218,7 @@ export default class AutoAV {
                     this.log('🚀 Scores Posted. Waiting 16 Seconds...');
 
                     // TODO: Make this time dynamic and configurable
+                    this.willStopRecording = true;
                     setTimeout(() => this.stopRecording(), 16000); // As of 2024, the time to actually see the match details happens at about 11 seconds, so we'll wait 16 seconds to be safe
                 }
             }
