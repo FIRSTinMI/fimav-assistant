@@ -73,11 +73,13 @@ export default class VmixService {
             });
         }
 
-        await Promise.all([0, 1, 2].map(idx => setStreamInfo(streamInfo.find(info => info.index === idx) ?? {
-            index: idx,
-            rtmpUrl: '',
-            rtmpKey: ''
-        })));
+        for (let idx = 0; idx < 3; idx++) {
+            await setStreamInfo(streamInfo.find(info => info.index === idx) ?? {
+                index: idx,
+                rtmpUrl: '',
+                rtmpKey: ''
+            });
+        }
     }
 
     async AddBrowserInput(url: string): Promise<void> {
