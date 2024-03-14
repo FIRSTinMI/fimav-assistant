@@ -7,7 +7,7 @@ import {
     getAssetPath,
     logsPath,
     resolveHtmlPath,
-    isDebug as isDebugFn
+    isDebug as isDebugFn,
 } from './util';
 import registerAllEvents from './register-events';
 import { getStore } from './store';
@@ -74,7 +74,7 @@ const createWindow = async () => {
         show: false,
         width: 1024,
         height: 728,
-        icon: getAssetPath('icon.png'),
+        icon: getAssetPath('icon.ico'),
         webPreferences: {
             preload: app.isPackaged
                 ? path.join(__dirname, 'preload.js')
@@ -127,7 +127,7 @@ export const quitApp = () => {
     appIsQuitting = true;
     addons.stop();
     app.quit();
-}
+};
 
 /**
  * Add event listeners...
@@ -166,7 +166,7 @@ if (!instanceLock) {
             if (store.get('apiKey')) {
                 try {
                     await setupSignalR(store, createAlertsWindow);
-                } catch { } // eslint-disable-line no-empty
+                } catch {} // eslint-disable-line no-empty
             }
 
             // Create the main window
@@ -200,4 +200,4 @@ if (!instanceLock) {
             return undefined;
         })
         .catch(log.error);
-} 
+}
