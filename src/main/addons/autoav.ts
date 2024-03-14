@@ -1,13 +1,11 @@
 import { HubConnection, HubConnectionBuilder } from '@microsoft/signalr';
 import nodeFetch from 'node-fetch';
 import log from 'electron-log';
-import { invokeExpectResponse } from '../window_components/signalR';
-import VmixRecordingService from '../../services/VmixService';
 import FMSMatchStatus from '../../models/FMSMatchState';
-import attemptRename, { getNewestFile } from '../../utils/recording';
+import attemptRename from '../../utils/recording';
 import { AddonLoggers } from './addon-loggers';
-import { signalrToElectronLog } from '../util';
-import Event from '../../models/Event';
+import { getCurrentEvent, signalrToElectronLog } from '../util';
+import VmixService from '../../services/VmixService';
 
 export default class AutoAV {
     private static instance: AutoAV;
@@ -24,9 +22,6 @@ export default class AutoAV {
     // Loggers
     private logs: AddonLoggers | null = null;
 
-    // VMix Service
-    private vmixService: VmixRecordingService | null = null;
-
     // Last file recorded
     private currentFile: string | null = null;
 
@@ -41,31 +36,44 @@ export default class AutoAV {
         };
     }
 
-    private stopRecording() {
-        if (!this.vmixService) return;
-        this.vmixService
-            .StopRecording()
+    /**
+     * Stop recording
+     * @returns void
+     */
+    private async stopRecording() {
+        // Check if we're recording
+        if (!(await VmixService.Instance.isRecording())) {
+            this.log('🟥 Not Recording');
+            return;
+        }
+
+        VmixService.Instance.StopRecording()
             .then(async () => {
                 this.log('🟥 Stopped Recording');
 
                 // If we don't have a start time or data, don't try to rename
-                if (!this.lastMatchStartData)
-                    return undefined;
+                if (!this.lastMatchStartData) return undefined;
 
                 // If we don't have an event name, try to get it
-                if (!this.currentEventName || this.currentEventName.length === 0) {
-                    const events = await invokeExpectResponse<Event[]>('GetEvents', 'Events');
-                    if (events.length > 0) {
-                        const now = new Date();
-                        const currentEvent = events.find(
-                            (e) => now >= new Date(e.start) && now <= new Date(e.end)
-                        );
-                        if (currentEvent) {
-                            this.setEventName(currentEvent.name);
-                        } else {
-                            this.setEventName('');
-                        }
-                    }
+                if (
+                    !this.currentEventName ||
+                    this.currentEventName.length === 0
+                ) {
+                    this.log(
+                        'ℹ Event Name not Present. Fetching current event name...'
+                    );
+                    await getCurrentEvent()
+                        .then((e) => {
+                            if (e) {
+                                this.currentEventName = e.name;
+                            }
+                        })
+                        .catch((e) => {
+                            this.log(
+                                `‼️ Error Fetching Event Name: ${e}`,
+                                'err'
+                            );
+                        });
                 }
 
                 // Attempt to rename the file
@@ -87,6 +95,30 @@ export default class AutoAV {
             })
             .catch((err) => {
                 this.log(`‼️ Error Stopping Recording: ${err}`);
+                this.log(err);
+            });
+    }
+
+    /**
+     * Start Recording
+     * @returns void
+     */
+    private startRecording(matchInfo: FMSMatchStatus) {
+        VmixService.Instance.StartRecording()
+            .then(() => {
+                this.log('🔴 Started Recording');
+                this.lastMatchStartData = matchInfo;
+
+                // Give it some time, then attempt to find the file
+                setTimeout(async () => {
+                    this.currentFile =
+                        await VmixService.Instance.GetCurrentRecording();
+                }, 3000);
+
+                return undefined;
+            })
+            .catch((err) => {
+                this.log(`‼️ Error Starting Recording: ${err}`);
             });
     }
 
@@ -94,9 +126,6 @@ export default class AutoAV {
     public start() {
         // Notify Parent logs that we're running
         this.log('AutoAV Service Started');
-
-        // Create new VMix Service
-        this.vmixService = new VmixRecordingService();
 
         // Build a connection to the SignalR Hub
         this.hubConnection = new HubConnectionBuilder()
@@ -130,8 +159,10 @@ export default class AutoAV {
             (info: FMSMatchStatus) => {
                 // Log the change
                 this.log(
-                    `Match Status Changed: ${this.lastState ? this.lastState.MatchState : 'Unknown'
-                    } -> ${info.MatchState} for ${info.Level} Match ${info.MatchNumber
+                    `Match Status Changed: ${
+                        this.lastState ? this.lastState.MatchState : 'Unknown'
+                    } -> ${info.MatchState} for ${info.Level} Match ${
+                        info.MatchNumber
                     } (Play #${info.PlayNumber})`
                 );
 
@@ -139,26 +170,10 @@ export default class AutoAV {
                 this.lastState = info;
 
                 // Start recording when GameSpecificData is released (match starts)
-                if (info.MatchState === 'GameSpecificData' && !!this.vmixService) {
-                    this.vmixService
-                        .StartRecording()
-                        .then(() => {
-                            this.log('🔴 Started Recording');
-                            this.lastMatchStartData = info;
-
-                            // Give it some time, then attempt to find the file
-                            setTimeout(() => {
-                                // TODO: Make dynamic and configurable
-                                this.currentFile = getNewestFile(
-                                    'C:\\Users\\FIM\\Documents\\vMixStorage')
-                            }, 3000)
-
-                            return undefined;
-                        })
-                        .catch((err) => {
-                            this.log(`‼️ Error Starting Recording: ${err}`);
-                        });
-                } else if (info.MatchState === 'MatchCancelled') { // Estop!
+                if (info.MatchState === 'GameSpecificData') {
+                    this.startRecording(info);
+                } else if (info.MatchState === 'MatchCancelled') {
+                    // Estop!
                     setTimeout(() => this.stopRecording(), 10000); // Ok, but we wanna see the frantic running around for a bit
                 }
             }
@@ -197,7 +212,7 @@ export default class AutoAV {
 
         // Dummies to get log to shush
         bogusEvents.forEach((e) => {
-            this.hubConnection?.on(e, () => { });
+            this.hubConnection?.on(e, () => {});
         });
 
         // Register connected/disconnected events
@@ -227,6 +242,40 @@ export default class AutoAV {
         this.log('AutoAV Service Stopped');
         // Stop the SignalR Hub connection
         this.hubConnection?.stop();
+    }
+
+    /**
+     * Stop recording (for development)
+     * Fill in random info and stop recording
+     */
+    public devStopRecording() {
+        if (!this.lastMatchStartData) {
+            this.lastMatchStartData = {
+                MatchState: 'GameSpecificData',
+                Level: 'Qualification',
+                MatchNumber: 1,
+                PlayNumber: 1,
+            };
+        } else {
+            this.lastMatchStartData = {
+                MatchState: 'GameSpecificData',
+                Level: 'Qualification',
+                MatchNumber: this.lastMatchStartData.MatchNumber + 1,
+                PlayNumber: 1,
+            };
+        }
+        this.stopRecording();
+    }
+
+    public devStartRecording() {
+        this.startRecording({
+            MatchState: 'GameSpecificData',
+            Level: 'Qualification',
+            MatchNumber: this.lastMatchStartData
+                ? this.lastMatchStartData.MatchNumber + 1
+                : 1,
+            PlayNumber: 1,
+        });
     }
 
     // Log a message

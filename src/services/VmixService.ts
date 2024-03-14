@@ -1,6 +1,7 @@
 import log from 'electron-log';
-import { invokeExpectResponse } from "../main/window_components/signalR";
-import { getStore } from "../main/store";
+import { invokeExpectResponse } from '../main/window_components/signalR';
+import { getStore } from '../main/store';
+import { XMLParser } from 'fast-xml-parser';
 
 type VmixSettings = {
     baseUrl: string;
@@ -9,11 +10,10 @@ type VmixSettings = {
 };
 
 export default class VmixService {
+    private static instance: VmixService;
+
     private settings: VmixSettings;
 
-    /**
-     *
-     */
     constructor(settings?: VmixSettings) {
         if (settings) {
             this.settings = settings;
@@ -51,33 +51,48 @@ export default class VmixService {
 
     async SetStreamInfo(): Promise<void> {
         type StreamInfo = {
-            index: number,
-            rtmpUrl: string,
-            rtmpKey: string
-        }
+            index: number;
+            rtmpUrl: string;
+            rtmpKey: string;
+        };
 
-        log.info('Setting stream info')
+        log.info('Setting stream info');
 
-        const streamInfo: StreamInfo[] = await invokeExpectResponse('GetStreamInfo', 'StreamInfo');
+        const streamInfo: StreamInfo[] = await invokeExpectResponse(
+            'GetStreamInfo',
+            'StreamInfo'
+        );
         log.info(streamInfo);
 
         const setStreamInfo = async (info: StreamInfo): Promise<void> => {
             info.rtmpUrl ??= '';
             info.rtmpKey ??= '';
 
-            await fetch(`${this.settings.baseUrl}?Function=StreamingSetURL&Value=${info.index},${info.rtmpUrl}`, {
-                headers: this.createHeaders(),
-            });
-            await fetch(`${this.settings.baseUrl}?Function=StreamingSetKey&Value=${info.index},${info.rtmpKey}`, {
-                headers: this.createHeaders(),
-            });
-        }
+            await fetch(
+                `${this.settings.baseUrl}?Function=StreamingSetURL&Value=${info.index},${info.rtmpUrl}`,
+                {
+                    headers: this.createHeaders(),
+                }
+            );
+            await fetch(
+                `${this.settings.baseUrl}?Function=StreamingSetKey&Value=${info.index},${info.rtmpKey}`,
+                {
+                    headers: this.createHeaders(),
+                }
+            );
+        };
 
-        await Promise.all([0, 1, 2].map(idx => setStreamInfo(streamInfo.find(info => info.index === idx) ?? {
-            index: idx,
-            rtmpUrl: '',
-            rtmpKey: ''
-        })));
+        await Promise.all(
+            [0, 1, 2].map((idx) =>
+                setStreamInfo(
+                    streamInfo.find((info) => info.index === idx) ?? {
+                        index: idx,
+                        rtmpUrl: '',
+                        rtmpKey: '',
+                    }
+                )
+            )
+        );
     }
 
     async AddBrowserInput(url: string): Promise<void> {
@@ -89,13 +104,6 @@ export default class VmixService {
         );
     }
 
-    async GetInputs(): Promise<string> {
-        const response = await fetch(`${this.settings.baseUrl}`, {
-            headers: this.createHeaders(),
-        });
-        return response.text();
-    }
-
     async RenameInput(guid: string, name: string): Promise<void> {
         await fetch(
             `${this.settings.baseUrl}?Function=SetInputName&Input=${guid}&Value=${name}`,
@@ -103,5 +111,36 @@ export default class VmixService {
                 headers: this.createHeaders(),
             }
         );
+    }
+
+    async GetBase(): Promise<any> {
+        return fetch(`${this.settings.baseUrl}`, {
+            headers: this.createHeaders(),
+        })
+            .then((response) => response.text())
+            .then((xml) => {
+                // Parse XML
+                return new XMLParser({
+                    ignoreAttributes: false,
+                    attributeNamePrefix: '',
+                }).parse(xml);
+            });
+    }
+
+    async GetCurrentRecording(): Promise<string> {
+        return this.GetBase().then((parsed) => {
+            return parsed.vmix.recording.filename1;
+        });
+    }
+
+    async isRecording(): Promise<boolean> {
+        return this.GetBase().then((parsed) => {
+            return parsed.vmix.recording['#text'] === 'True';
+        });
+    }
+
+    public static get Instance(): VmixService {
+        if (!this.instance) this.instance = new this();
+        return this.instance;
     }
 }

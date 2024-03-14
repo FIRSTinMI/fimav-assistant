@@ -23,11 +23,13 @@ export default async function attemptRename(
 
             // Build the file name
             const playString =
-                matchStatus.PlayNumber > 1 ? ` (Play #${matchStatus.PlayNumber})` : '';
+                matchStatus.PlayNumber > 1
+                    ? ` (Play #${matchStatus.PlayNumber})`
+                    : '';
             const newFileName = `${eventName} - ${matchStatus.Level} Match ${matchStatus.MatchNumber}${playString}.mp4`;
 
             // Check if event name folder exists (videoLocation has the file name at the end, so we must "go up" one directory)
-            const eventFolder = path.resolve(videoLocation, "../", eventName);
+            const eventFolder = path.resolve(videoLocation, '../', eventName);
             if (!fs.existsSync(eventFolder)) {
                 fs.mkdirSync(eventFolder);
             }
@@ -44,47 +46,4 @@ export default async function attemptRename(
             reject(e);
         }
     });
-}
-
-// Matches the filename and grabs each part in the order that it occurs in the file name
-// const fileNameRegex =
-//     /.* - (\d*) ([a-zA-Z]*) (\d*) - (\d*)-(\d*)-(\d*) ([a-zA-Z]*).*/;
-
-// function vmixFilenameToDate(filename: string): Date | null {
-//     // Vmix file name example: "capture - 23 September 2023 - 08-35-04 AM.mp4"
-//     // Regex makes it this:
-//     // ['capture - 23 September 2023 - 08-35-04 AM.mp4', '23', 'September', '2023', '08', '35', '04', 'AM']
-//     const [full, day, month, year, hour, minute, second, ampm] =
-//         fileNameRegex.exec(filename) ?? [];
-//     if (full === undefined) {
-//         return null;
-//     }
-
-//     // Translate to date object
-//     const date = new Date();
-//     date.setFullYear(parseInt(year, 10));
-//     date.setMonth(parseInt(month, 10) - 1);
-//     date.setDate(parseInt(day, 10));
-//     date.setHours(parseInt(hour, 10) + (ampm === 'PM' ? 12 : 0));
-//     date.setMinutes(parseInt(minute, 10));
-//     date.setSeconds(parseInt(second, 10));
-//     date.setMilliseconds(0);
-//     return date;
-// }
-
-
-// Get the newest file in a directory, igoring folders
-export function getNewestFile(dir: string): string | null {
-    const files = fs
-        .readdirSync(dir, { withFileTypes: true })
-        .filter((f) => f.isFile())
-        .map((f) => f.name)
-        .sort((a, b) => {
-            return (
-                fs.statSync(path.join(dir, b)).mtime.getTime() -
-                fs.statSync(path.join(dir, a)).mtime.getTime()
-            );
-        });
-
-    return files.length > 0 ? path.join(dir, files[0]) : null;
 }
