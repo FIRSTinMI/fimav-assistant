@@ -82,17 +82,16 @@ export default class VmixService {
             );
         };
 
-        await Promise.all(
-            [0, 1, 2].map((idx) =>
-                setStreamInfo(
-                    streamInfo.find((info) => info.index === idx) ?? {
-                        index: idx,
-                        rtmpUrl: '',
-                        rtmpKey: '',
-                    }
-                )
-            )
-        );
+        for (let idx = 0; idx < 3; idx += 1) {
+            // We want to explicitly run these operations in order, we cannot make use of parallelization
+            // TODO: Promise chain these so we can get out of the loop
+            // eslint-disable-next-line no-await-in-loop
+            await setStreamInfo(streamInfo.find(info => info.index === idx) ?? {
+                index: idx,
+                rtmpUrl: '',
+                rtmpKey: ''
+            });
+        }
     }
 
     async AddBrowserInput(url: string): Promise<void> {
