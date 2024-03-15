@@ -6,6 +6,8 @@ import attemptRename from '../../utils/recording';
 import { AddonLoggers } from './addon-loggers';
 import { getCurrentEvent, signalrToElectronLog } from '../util';
 import VmixService from '../../services/VmixService';
+import Event from '../../models/Event';
+import { invokeExpectResponse } from '../window_components/signalR';
 
 export default class AutoAV {
     private static instance: AutoAV;
@@ -70,18 +72,7 @@ export default class AutoAV {
                     this.log(
                         'ℹ Event Name not Present. Fetching current event name...'
                     );
-                    await getCurrentEvent()
-                        .then((e) => {
-                            if (e) {
-                                this.currentEventName = e.name;
-                            }
-                        })
-                        .catch((e) => {
-                            this.log(
-                                `‼️ Error Fetching Event Name: ${e}`,
-                                'err'
-                            );
-                        });
+                    this.currentEventName = await this.fetchEventName();
                 }
 
                 // Attempt to rename the file
@@ -168,10 +159,8 @@ export default class AutoAV {
             (info: FMSMatchStatus) => {
                 // Log the change
                 this.log(
-                    `Match Status Changed: ${
-                        this.lastState ? this.lastState.MatchState : 'Unknown'
-                    } -> ${info.MatchState} for ${info.Level} Match ${
-                        info.MatchNumber
+                    `Match Status Changed: ${this.lastState ? this.lastState.MatchState : 'Unknown'
+                    } -> ${info.MatchState} for ${info.Level} Match ${info.MatchNumber
                     } (Play #${info.PlayNumber})`
                 );
 
@@ -235,7 +224,7 @@ export default class AutoAV {
 
         // Dummies to get log to shush
         bogusEvents.forEach((e) => {
-            this.hubConnection?.on(e, () => {});
+            this.hubConnection?.on(e, () => { });
         });
 
         // Register connected/disconnected events
@@ -298,6 +287,21 @@ export default class AutoAV {
                 ? this.lastMatchStartData.MatchNumber + 1
                 : 1,
             PlayNumber: 1,
+        });
+    }
+
+    // Fetch the event name
+    private async fetchEventName(): Promise<string | null> {
+        return invokeExpectResponse<Event[]>('GetEvents', 'Events').then((events: Event[]) => {
+            return getCurrentEvent(events)
+        }).then((e) => {
+            return e ? e.name : null;
+        }).catch((e) => {
+            this.log(
+                `‼️ Error Fetching Event Name: ${e}`,
+                'err'
+            );
+            return null;
         });
     }
 

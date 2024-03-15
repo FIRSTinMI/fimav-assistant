@@ -22,6 +22,7 @@ interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
 
 export default class MenuBuilder {
     mainWindow: BrowserWindow;
+    
     addons: Addons;
 
     constructor(mainWindow: BrowserWindow, addons: Addons) {

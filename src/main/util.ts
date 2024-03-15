@@ -6,7 +6,6 @@ import { LogFunctions } from 'electron-log';
 import { LogLevel } from '@microsoft/signalr';
 import { hostname } from 'os';
 import { exec } from 'child_process';
-import { invokeExpectResponse } from './window_components/signalR';
 import Event from '../models/Event';
 
 export function resolveHtmlPath(
@@ -44,27 +43,27 @@ export const signalrToElectronLog = (
 ): void => {
     if (log === null) return;
     switch (logLevel) {
-        case LogLevel.Debug:
-        case LogLevel.Trace:
-            if (isDebug()) log.info(message);
-            break;
-        case LogLevel.Information:
-            log.info(message);
-            break;
-        case LogLevel.Warning:
-            log.warn(message);
-            break;
-        case LogLevel.Error:
-            log.error(message);
-            break;
-        case LogLevel.Critical:
-            log.error(message);
-            break;
-        case LogLevel.None:
-            log.info(message);
-            break;
-        default:
-            break;
+    case LogLevel.Debug:
+    case LogLevel.Trace:
+        if (isDebug()) log.info(message);
+        break;
+    case LogLevel.Information:
+        log.info(message);
+        break;
+    case LogLevel.Warning:
+        log.warn(message);
+        break;
+    case LogLevel.Error:
+        log.error(message);
+        break;
+    case LogLevel.Critical:
+        log.error(message);
+        break;
+    case LogLevel.None:
+        log.info(message);
+        break;
+    default:
+        break;
     }
 };
 
@@ -136,15 +135,12 @@ export const psCommand = (command: string): Promise<string> => {
 
 /**
  * Find the currently active event from a list of events
- * @param events Events, if not provided, will be fetched from the server
+ * @param events Events list
  * @returns Currently active event, if any
  */
 export const getCurrentEvent = async (
-    events?: Event[]
+    events: Event[]
 ): Promise<Event | null> => {
-    if (!events) {
-        events = await invokeExpectResponse<Event[]>('GetEvents', 'Events');
-    }
     if (events.length > 0) {
         const now = new Date();
         const currentEvent = events.find(

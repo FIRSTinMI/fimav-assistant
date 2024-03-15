@@ -1,7 +1,7 @@
 import log from 'electron-log';
+import { XMLParser } from 'fast-xml-parser';
 import { invokeExpectResponse } from '../main/window_components/signalR';
 import { getStore } from '../main/store';
-import { XMLParser } from 'fast-xml-parser';
 
 type VmixSettings = {
     baseUrl: string;
