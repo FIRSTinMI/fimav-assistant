@@ -14,6 +14,7 @@ import { getStore } from './store';
 import Event from '../models/Event';
 import AutoAV from './addons/autoav';
 import { StaticIpInfo } from '../models/HWCheckResponse';
+import { getCurrentEvent } from './util';
 
 // Use this file to register all events. For uniformity, all events should send their response as <event-name>-response
 
@@ -94,14 +95,11 @@ export default function registerAllEvents(window: BrowserWindow | null) {
     });
 
     // Register a SignalR listener for the Events response.  Any time an event is updated, we'll send the updated list to the renderer
-    registerListener('Events', (events: Event[]) => {
+    registerListener('Events', async (events: Event[]) => {
         window?.webContents.send('new-event-info', events);
 
         // Find the event that is current running (date is between start and end)
-        const now = new Date();
-        const currentEvent = events.find(
-            (e) => now >= new Date(e.start) && now <= new Date(e.end)
-        );
+        const currentEvent = await getCurrentEvent(events);
         if (currentEvent) {
             AutoAV.Instance.setEventName(currentEvent.name);
         } else {
@@ -117,7 +115,10 @@ export default function registerAllEvents(window: BrowserWindow | null) {
     });
 
     ipcMain.on('set-venue-ip-dhcp', async (event, info: StaticIpInfo[]) => {
-        event.reply('set-venue-ip-dhcp-response', await enableDhcp(info[0].interface));
+        event.reply(
+            'set-venue-ip-dhcp-response',
+            await enableDhcp(info[0].interface)
+        );
     });
 
     ipcMain.on('alerts:getAlerts', (event) => {

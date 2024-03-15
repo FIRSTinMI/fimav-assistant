@@ -4,7 +4,7 @@ import {
     shell,
     BrowserWindow,
     MenuItemConstructorOptions,
-    dialog
+    dialog,
 } from 'electron';
 import Addons from 'main/addons';
 import { platform } from 'os';
@@ -13,7 +13,7 @@ import { isDebug, logsPath } from '../util';
 import createAlertsWindow, { getAlertsWindow } from './alertsWindow';
 import { quitApp } from '../main'; // eslint-disable-line import/no-cycle
 import VmixService from '../../services/VmixService';
-import { XMLParser } from 'fast-xml-parser';
+import AutoAV from '../addons/autoav';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
     selector?: string;
@@ -22,7 +22,7 @@ interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
 
 export default class MenuBuilder {
     mainWindow: BrowserWindow;
-
+    
     addons: Addons;
 
     constructor(mainWindow: BrowserWindow, addons: Addons) {
@@ -54,14 +54,14 @@ export default class MenuBuilder {
                     },
                     ...(dev
                         ? ([
-                            {
-                                label: 'Quit',
-                                role: 'quit',
-                                click() {
-                                    quitApp();
-                                },
-                            },
-                        ] as MenuItemConstructorOptions[])
+                              {
+                                  label: 'Quit',
+                                  role: 'quit',
+                                  click() {
+                                      quitApp();
+                                  },
+                              },
+                          ] as MenuItemConstructorOptions[])
                         : []),
                 ],
             });
@@ -139,18 +139,18 @@ export default class MenuBuilder {
                             label: 'Set Stream Keys',
                             click: async () => {
                                 try {
-                                    const service = new VmixService();
-                                    await service.SetStreamInfo();
+                                    await VmixService.Instance.SetStreamInfo();
                                     dialog.showMessageBox({
-                                        message: 'Successfully set vMix streaming locations',
+                                        message:
+                                            'Successfully set vMix streaming locations',
                                         title: 'vMix Streaming',
-                                        type: 'info'
+                                        type: 'info',
                                     });
                                 } catch (e: any) {
                                     dialog.showMessageBox({
                                         message: `Failed to set streaming locations: ${e.toString()}`,
                                         title: 'vMix Streaming',
-                                        type: 'info'
+                                        type: 'info',
                                     });
                                 }
                             },
@@ -161,6 +161,22 @@ export default class MenuBuilder {
                                 MenuBuilder.addLiveCapInput();
                             },
                         },
+                        ...(dev
+                            ? ([
+                                  {
+                                      label: 'Start Recording (Dev)',
+                                      click() {
+                                          AutoAV.Instance.devStartRecording();
+                                      },
+                                  },
+                                  {
+                                      label: 'Stop Recording (Dev)',
+                                      click() {
+                                          AutoAV.Instance.devStopRecording();
+                                      },
+                                  },
+                              ] as MenuItemConstructorOptions[])
+                            : []),
                     ],
                 },
                 {
@@ -244,21 +260,14 @@ export default class MenuBuilder {
     }
 
     static async addLiveCapInput() {
-        const service = new VmixService();
-
         try {
             // Add input to vMix
-            await service.AddBrowserInput('http://127.0.0.1:3000/');
+            await VmixService.Instance.AddBrowserInput(
+                'http://127.0.0.1:3000/'
+            );
 
             // Get inputs
-            const inputs = await service.GetInputs();
-
-            // Inputs is XML, parse it
-            const parsed = new XMLParser({
-                ignoreAttributes: false,
-                attributeNamePrefix: '',
-            }).parse(inputs);
-
+            const parsed = await VmixService.Instance.GetBase();
 
             // Find the input we just added
             let found = false;
@@ -269,7 +278,10 @@ export default class MenuBuilder {
                     input.title === 'Browser 127.0.0.1'
                 ) {
                     // Rename it
-                    await service.RenameInput(input.key, 'Live Captions');
+                    await VmixService.Instance.RenameInput(
+                        input.key,
+                        'Live Captions'
+                    );
                     found = true;
                 }
             });

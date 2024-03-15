@@ -6,7 +6,7 @@ export default function buildTray(
     RESOURCES_PATH: string,
     version: string
 ) {
-    const tray = new Tray(path.join(RESOURCES_PATH, 'icon.png'));
+    const tray = new Tray(path.join(RESOURCES_PATH, 'icon.ico'));
     const contextMenu = Menu.buildFromTemplate([
         {
             label: 'Show AV Assistant',
