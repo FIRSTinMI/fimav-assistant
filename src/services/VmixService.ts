@@ -58,10 +58,11 @@ export default class VmixService {
 
         log.info('Setting stream info');
 
-        const streamInfo: StreamInfo[] = await invokeExpectResponse(
+        let streamInfo: StreamInfo[] = await invokeExpectResponse(
             'GetStreamInfo',
             'StreamInfo'
         );
+        streamInfo = streamInfo.filter(info => info.rtmpKey && info.rtmpUrl);
         log.info(streamInfo);
 
         const setStreamInfo = async (info: StreamInfo): Promise<void> => {
@@ -83,14 +84,22 @@ export default class VmixService {
         };
 
         for (let idx = 0; idx < 3; idx += 1) {
+            // We want to overwrite the index from the server so that we always start populating
+            // the first stream
+            let info = streamInfo[idx];
+            if (info) {
+                info.index = idx;
+            } else {
+                info = {
+                    index: idx,
+                    rtmpUrl: '',
+                    rtmpKey: ''
+                }
+            }
             // We want to explicitly run these operations in order, we cannot make use of parallelization
             // TODO: Promise chain these so we can get out of the loop
             // eslint-disable-next-line no-await-in-loop
-            await setStreamInfo(streamInfo.find(info => info.index === idx) ?? {
-                index: idx,
-                rtmpUrl: '',
-                rtmpKey: ''
-            });
+            await setStreamInfo(info);
         }
     }
 
