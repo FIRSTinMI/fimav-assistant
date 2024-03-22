@@ -4,7 +4,7 @@ import HWPingResponse from 'models/HWPingResponse';
 import { EventEmitter } from 'stream';
 import { getCartNumberFromHostname } from '../util';
 import { AddonLoggers } from './addon-loggers';
-import { fetchAndParseAudioDevices } from '../events/HWCheck';
+// import { fetchAndParseAudioDevices } from '../events/HWCheck';
 
 const pingConfig = {
     timeout: 3,
@@ -137,21 +137,23 @@ export default class HWPing {
 
     // Audio Promises
     private async verifyAudio() {
-        return fetchAndParseAudioDevices(this.logs?.out ?? log).then((devices) => {
-            const cmds: Promise<any>[] = []
-            devices.forEach((device) => {
-                if (device.name === 'OUT 1-2' && device.sub_name.includes('BEHRINGER X-AIR')) {
-                    // We won't mess with mute status here, but we will mess with having it be set as the default device
-                    if (device.default !== 'Render') {
-                        // TODO: Show obtrustive dialog that doesn't allow the user close it until they click "OK" or dismiss it
-                    }
-                }
-            });
+        this.log('Skipping audio check for now.');
+        return Promise.resolve(null);
+        // return fetchAndParseAudioDevices(this.logs?.out ?? log).then((devices) => {
+        //     const cmds: Promise<any>[] = []
+        //     devices.forEach((device) => {
+        //         if (device.name === 'OUT 1-2' && device.sub_name.includes('BEHRINGER X-AIR')) {
+        //             // We won't mess with mute status here, but we will mess with having it be set as the default device
+        //             if (device.default !== 'Render') {
+        //                 // TODO: Show obtrustive dialog that doesn't allow the user close it until they click "OK" or dismiss it
+        //             }
+        //         }
+        //     });
 
-            return Promise.all(cmds);
-        }).catch((err) => {
-            this.log(`Error muting audio: ${err}`);
-        });
+        //     return Promise.all(cmds);
+        // }).catch((err) => {
+        //     this.log(`Error muting audio: ${err}`);
+        // });
     }
 
     // Stop the service
