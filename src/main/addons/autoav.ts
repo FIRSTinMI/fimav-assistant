@@ -211,8 +211,6 @@ export default class AutoAV {
                     setTimeout(() => this.stopRecording(), 16000); // As of 2024, the time to actually see the match details happens at about 11 seconds, so we'll wait 16 seconds to be safe
                 }
             }
-
-            return this;
         });
 
         const bogusEvents = [
