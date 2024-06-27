@@ -9,8 +9,14 @@ import VmixService from '../../services/VmixService';
 import Event from '../../models/Event';
 import { invokeExpectResponse } from '../window_components/signalR';
 
+type AutoAVSettings = {
+    fmsBaseUrl: string;
+};
+
 export default class AutoAV {
     private static instance: AutoAV;
+
+    private settings: AutoAVSettings;
 
     // Match data from the last time the match started
     private lastMatchStartData: FMSMatchStatus | null = null;
@@ -42,6 +48,14 @@ export default class AutoAV {
             out: log.scope('autoav.out'),
             err: log.scope('autoav.err'),
         };
+    }
+
+    getSettings(): AutoAVSettings {
+        return {...this.settings};
+    }
+
+    updateSettings(settings: AutoAVSettings): void {
+        this.settings = settings;
     }
 
     /**

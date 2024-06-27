@@ -11,6 +11,7 @@ import { platform } from 'os';
 import { updateNow } from '../updates/update';
 import { isDebug, logsPath } from '../util';
 import createAlertsWindow, { getAlertsWindow } from './alertsWindow';
+import createAutoAVWindow, { getAutoAVWindow } from './autoavWindow';
 import { quitApp } from '../main'; // eslint-disable-line import/no-cycle
 import VmixService from '../../services/VmixService';
 import AutoAV from '../addons/autoav';
@@ -54,14 +55,14 @@ export default class MenuBuilder {
                     },
                     ...(dev
                         ? ([
-                              {
-                                  label: 'Quit',
-                                  role: 'quit',
-                                  click() {
-                                      quitApp();
-                                  },
-                              },
-                          ] as MenuItemConstructorOptions[])
+                            {
+                                label: 'Quit',
+                                role: 'quit',
+                                click() {
+                                    quitApp();
+                                },
+                            },
+                        ] as MenuItemConstructorOptions[])
                         : []),
                 ],
             });
@@ -117,6 +118,17 @@ export default class MenuBuilder {
                             label: 'AutoAV',
                             submenu: [
                                 {
+                                    label: 'Settings',
+                                    click() {
+                                        const autoAVWindow = getAutoAVWindow();
+                                        if (autoAVWindow) {
+                                            autoAVWindow.show();
+                                        } else {
+                                            createAutoAVWindow();
+                                        }
+                                    },
+                                },
+                                {
                                     label: 'Restart',
                                     click() {
                                         that.addons.restartAutoAV();
@@ -163,19 +175,19 @@ export default class MenuBuilder {
                         },
                         ...(dev
                             ? ([
-                                  {
-                                      label: 'Start Recording (Dev)',
-                                      click() {
-                                          AutoAV.Instance.devStartRecording();
-                                      },
-                                  },
-                                  {
-                                      label: 'Stop Recording (Dev)',
-                                      click() {
-                                          AutoAV.Instance.devStopRecording();
-                                      },
-                                  },
-                              ] as MenuItemConstructorOptions[])
+                                {
+                                    label: 'Start Recording (Dev)',
+                                    click() {
+                                        AutoAV.Instance.devStartRecording();
+                                    },
+                                },
+                                {
+                                    label: 'Stop Recording (Dev)',
+                                    click() {
+                                        AutoAV.Instance.devStopRecording();
+                                    },
+                                },
+                            ] as MenuItemConstructorOptions[])
                             : []),
                     ],
                 },

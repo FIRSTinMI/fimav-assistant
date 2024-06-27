@@ -12,7 +12,9 @@ import { getAlertsWindow } from './window_components/alertsWindow';
 import HWPing from './addons/hw-ping';
 import { getStore } from './store';
 import Event from '../models/Event';
+import FullAVSettings from '../models/FullAVSettings';
 import AutoAV from './addons/autoav';
+import VmixService from '../services/VmixService';
 import { StaticIpInfo } from '../models/HWCheckResponse';
 import { getCurrentEvent } from './util';
 
@@ -134,5 +136,18 @@ export default function registerAllEvents(window: BrowserWindow | null) {
     ipcMain.on('alerts:closeWindow', () => {
         log.info('Closing alerts window');
         getAlertsWindow()?.close();
+    });
+
+    ipcMain.on('autoav:getSettings', (event) => {
+        const settings: FullAVSettings = {
+            autoav: AutoAV.Instance.getSettings(),
+            vmix: VmixService.Instance.getSettings(),
+        };
+        event.reply('autoav:settings', settings);
+    });
+
+    ipcMain.on('autoav:updateSettings', (_, settings: FullAVSettings) => {
+        AutoAV.Instance.updateSettings(settings.autoav);
+        VmixService.Instance.updateSettings(settings.vmix);
     });
 }

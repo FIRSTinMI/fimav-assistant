@@ -22,6 +22,10 @@ export default class VmixService {
         }
     }
 
+    getSettings(): VmixSettings {
+        return {...this.settings};
+    }
+
     updateSettings(settings: VmixSettings): void {
         this.settings = settings;
     }

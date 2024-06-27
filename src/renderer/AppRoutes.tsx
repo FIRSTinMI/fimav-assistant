@@ -3,6 +3,7 @@ import HWCheck from './pages/hwcheck';
 import Welcome from './pages/welcome';
 import InternetSetup from './pages/internet_setup';
 import Alerts from './pages/alerts';
+import AutoAV from './pages/autoav';
 import CameraSetup from './pages/camera_setup';
 import FallbackToDocs from './pages/fallbackToDocs';
 
@@ -20,6 +21,7 @@ function AppRoutes() {
             <Routes>
                 <Route path="/" element={<Welcome />} />
                 <Route path="/alerts" element={<Alerts />} />
+                <Route path="/autoav" element={<AutoAV />} />
 
                 {/* Each Step should be defined here, and each step handles itself. Use this to rearrange steps */}
                 <Route
