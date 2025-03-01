@@ -302,7 +302,7 @@ export default class AutoAV {
         return invokeExpectResponse<Event[]>('GetEvents', 'Events').then((events: Event[]) => {
             return getCurrentEvent(events)
         }).then((e) => {
-            return e ? new Date().getFullYear() + ' ' + e.name : null;
+            return e ? `${new Date().getFullYear()} ${e.name}` : null;
         }).catch((e) => {
             this.log(
                 `‼️ Error Fetching Event Name: ${e}`,
