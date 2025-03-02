@@ -97,7 +97,7 @@ export default class AutoAV {
                 this.log(err);
             });
 
-            invoke('WriteLog', 'Stopping recording');
+        invoke('WriteLog', 'Stopping recording');
     }
 
     /**
@@ -262,8 +262,8 @@ export default class AutoAV {
 
                 setTimeout(() => {
                     // Restart AutoAV
-                    stop();
-                    start();
+                    this.stop();
+                    this.start();
                 }, 120_000);
             });
     }
