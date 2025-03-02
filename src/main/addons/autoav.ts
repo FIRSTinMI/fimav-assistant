@@ -4,6 +4,7 @@ import log from 'electron-log';
 import FMSMatchStatus from '../../models/FMSMatchState';
 import attemptRename from '../../utils/recording';
 import { AddonLoggers } from './addon-loggers';
+import { restartAutoAV } from './index';
 import { getCurrentEvent, signalrToElectronLog } from '../util';
 import VmixService from '../../services/VmixService';
 import Event from '../../models/Event';
@@ -55,8 +56,6 @@ export default class AutoAV {
             return;
         }
 
-        invoke('WriteLog', 'Stopping recording');
-
         VmixService.Instance.StopRecording()
             .then(async () => {
                 this.log('🟥 Stopped Recording');
@@ -98,6 +97,8 @@ export default class AutoAV {
                 this.log(`‼️ Error Stopping Recording: ${err}`);
                 this.log(err);
             });
+
+            invoke('WriteLog', 'Stopping recording');
     }
 
     /**
@@ -107,9 +108,6 @@ export default class AutoAV {
     private startRecording(matchInfo: FMSMatchStatus) {
         VmixService.Instance.StartRecording()
             .then(() => {
-                invoke(
-                    'WriteLog',
-                    `Starting recording of ${matchInfo.Level} ${matchInfo.MatchNumber} (play ${matchInfo.PlayNumber})`);
                 this.log('🔴 Started Recording');
                 this.lastMatchStartData = matchInfo;
                 this.weAreRecording = true;
@@ -120,10 +118,16 @@ export default class AutoAV {
                         await VmixService.Instance.GetCurrentRecording();
                 }, 3000);
 
+                invoke(
+                    'WriteLog',
+                    `Starting recording of ${matchInfo.Level} ${matchInfo.MatchNumber} (play ${matchInfo.PlayNumber})`);
+
                 return undefined;
             })
             .catch((err) => {
                 this.log(`‼️ Error Starting Recording: ${err}`);
+
+                invoke('WriteLog', 'Failed to start recording. Unable to talk to vMix?');
             });
     }
 
@@ -223,6 +227,10 @@ export default class AutoAV {
             'matchtimerchanged',
             'plc_io_status_changed',
             'plc_match_status_changed',
+            'plc_connection_status_changed',
+            'robotversiondatachanged',
+            'azuresyncprogress',
+            'azuresyncstatuschanged'
         ];
 
         // Dummies to get log to shush
@@ -252,6 +260,8 @@ export default class AutoAV {
             .catch((err) => {
                 this.log(`AutoAV FMS Connection Failed: ${err}`);
                 invoke('WriteLog', `FMS connection failed! ${err}`);
+
+                setTimeout(() => restartAutoAV(), 120_000);
             });
     }
 
