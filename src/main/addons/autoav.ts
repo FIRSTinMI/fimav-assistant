@@ -4,7 +4,6 @@ import log from 'electron-log';
 import FMSMatchStatus from '../../models/FMSMatchState';
 import attemptRename from '../../utils/recording';
 import { AddonLoggers } from './addon-loggers';
-import { restartAutoAV } from './index';
 import { getCurrentEvent, signalrToElectronLog } from '../util';
 import VmixService from '../../services/VmixService';
 import Event from '../../models/Event';
@@ -261,7 +260,11 @@ export default class AutoAV {
                 this.log(`AutoAV FMS Connection Failed: ${err}`);
                 invoke('WriteLog', `FMS connection failed! ${err}`);
 
-                setTimeout(() => restartAutoAV(), 120_000);
+                setTimeout(() => {
+                    // Restart AutoAV
+                    stop();
+                    start();
+                }, 120_000);
             });
     }
 
