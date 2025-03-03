@@ -133,8 +133,8 @@ export default class AutoAV {
             })
             .catch((err) => {
                 this.log(`‼️ Error Starting Recording: ${err}`);
-
-                invoke('WriteLog', 'Failed to start recording. Unable to talk to vMix?');
+                this.emitter.emit('info', `‼️ Error Starting Recording. Is Vmix at ${VmixService.Instance.getUrl}?`);
+                invoke('WriteLog', `Failed to start recording. Unable to talk to vMix? Configured URL: ${VmixService.Instance.getUrl()}`);
             });
     }
 
