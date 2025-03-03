@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import { HubConnection, HubConnectionBuilder } from '@microsoft/signalr';
 import nodeFetch from 'node-fetch';
 import log from 'electron-log';
@@ -36,6 +37,9 @@ export default class AutoAV {
     // Track if we're already scheduled to stop recording
     private willStopRecording = false;
 
+    // Event Emitter
+    private emitter: EventEmitter = new EventEmitter();
+
     constructor() {
         // Start new log files
         this.logs = {
@@ -58,6 +62,7 @@ export default class AutoAV {
         VmixService.Instance.StopRecording()
             .then(async () => {
                 this.log('🟥 Stopped Recording');
+                this.emitter.emit('info', 'Stopped Recording. Renaming File...');
                 this.weAreRecording = false;
                 this.willStopRecording = false;
 
@@ -84,8 +89,10 @@ export default class AutoAV {
                     );
 
                     this.log(`Renamed last recording to ${filename}`);
+                    this.emitter.emit('info', `Renamed recording to ${filename}`);
                 } catch (err) {
                     this.log(`‼️ Error Renaming Recording: ${err}`, 'err');
+                    this.emitter.emit('info', `‼️ Error Renaming Recording: ${err}`);
                 } finally {
                     this.lastMatchStartData = null;
                 }
@@ -106,6 +113,7 @@ export default class AutoAV {
         VmixService.Instance.StartRecording()
             .then(() => {
                 this.log('🔴 Started Recording');
+                this.emitter.emit('info', `Started Recording ${matchInfo.Level} Match #${matchInfo.MatchNumber}-${matchInfo.PlayNumber}`);
                 this.lastMatchStartData = matchInfo;
                 this.weAreRecording = true;
 
@@ -125,7 +133,8 @@ export default class AutoAV {
     // Start AutoAV
     public start() {
         // Notify Parent logs that we're running
-        this.log('AutoAV Service Started');
+        this.log('Service Started');
+        this.emitter.emit('info', 'AutoAV Service Started');
 
         // Build a connection to the SignalR Hub
         this.hubConnection = new HubConnectionBuilder()
@@ -228,9 +237,11 @@ export default class AutoAV {
         // Register connected/disconnected events
         this.hubConnection.onreconnecting(() => {
             this.log('AutoAV FMS Connection Lost, Reconnecting');
+            this.emitter.emit('info', 'FMS Connection Lost, Reconnecting');
         });
         this.hubConnection.onclose(() => {
             this.log('AutoAV FMS Connection Closed!');
+            this.emitter.emit('info', 'FMS Connection Closed');
         });
 
         // Start connection to SignalR Hub
@@ -238,11 +249,13 @@ export default class AutoAV {
             .start()
             .then(() => {
                 this.log('AutoAV FMS Connection Established!');
+                this.emitter.emit('info', 'FMS Connection Established');
 
                 return undefined;
             })
             .catch((err) => {
                 this.log(`AutoAV FMS Connection Failed: ${err}`);
+                this.emitter.emit('info', `FMS Connection Failed.`);
             });
     }
 
@@ -250,6 +263,7 @@ export default class AutoAV {
     public stop() {
         // Log stopping
         this.log('AutoAV Service Stopped');
+        this.emitter.emit('info', 'Service Stopped');
         // Stop the SignalR Hub connection
         this.hubConnection?.stop();
     }
@@ -317,5 +331,20 @@ export default class AutoAV {
     public static get Instance(): AutoAV {
         if (!this.instance) this.instance = new this();
         return this.instance;
+    }
+
+    // eslint-disable-next-line no-unused-vars
+    public on(event: 'info', listener: (arg: string) => void) {
+        this.emitter.on(event, listener);
+    }
+
+    // eslint-disable-next-line no-unused-vars
+    public off(event: 'info', listener: (arg: string) => void) {
+        this.emitter.off(event, listener);
+    }
+
+    // eslint-disable-next-line no-unused-vars
+    public once(event: 'info', listener: (arg: string) => void) {
+        this.emitter.once(event, listener);
     }
 }

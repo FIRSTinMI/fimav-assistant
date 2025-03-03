@@ -21,6 +21,9 @@ const electronHandler = {
         once<d>(channel: string, func: (args: d) => void) {
             ipcRenderer.once(channel, (_event, args) => func(args));
         },
+        removeListener(channel: string, func: (...args: any[]) => void) {
+            ipcRenderer.removeListener(channel, func);
+        },
     },
 };
 
