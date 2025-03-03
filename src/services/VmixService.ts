@@ -147,6 +147,10 @@ export default class VmixService {
         });
     }
 
+    getUrl(): string {
+        return this.settings.baseUrl;
+    }
+
     public static get Instance(): VmixService {
         if (!this.instance) this.instance = new this();
         return this.instance;

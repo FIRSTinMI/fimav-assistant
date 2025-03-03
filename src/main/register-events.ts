@@ -21,6 +21,10 @@ import { getCurrentEvent } from './util';
 export default function registerAllEvents(window: BrowserWindow | null) {
     const store = getStore();
 
+    // Track the last responses
+    let lastHWPing: HWPingResponse = HWPing.Instance.currentStatus;
+    let lastAutoAV: string | null = null;
+
     ipcMain.on('hwcheck', async (event) => {
         const out = await HWCheck();
         event.reply('hwcheck-response', out);
@@ -113,6 +117,31 @@ export default function registerAllEvents(window: BrowserWindow | null) {
     // Register a emitter listener for the hwping response.  Any time the hwping service updates, we'll send the updated list to the renderer
     HWPing.Instance.on('hw-change', (res: HWPingResponse) => {
         window?.webContents.send('hw-change', res);
+        window?.webContents.send('backend-status-update', {
+            key: 'hw_stats',
+            val: res,
+        });
+        lastHWPing = res;
+    });
+
+    AutoAV.Instance.on('info', (info: string) => {
+        window?.webContents.send('backend-status-update', {
+            key: 'auto_av_log',
+            val: info,
+        });
+        lastAutoAV = info;
+    });
+
+    // Register a listener for the backend status.  Any time the renderer sends this event, we'll send the current status of the backend
+    ipcMain.on('backend-status', (event) => {
+        event.reply('backend-status-update', {
+            key: 'auto_av_log',
+            val: lastAutoAV,
+        });
+        event.reply('backend-status-update', {
+            key: 'hw_stats',
+            val: lastHWPing,
+        });
     });
 
     ipcMain.on('set-venue-ip-dhcp', async (event, info: StaticIpInfo[]) => {

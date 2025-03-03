@@ -136,8 +136,9 @@ export default class HWPing {
     }
 
     // Audio Promises
+    // eslint-disable-next-line class-methods-use-this
     private async verifyAudio() {
-        this.log('Skipping audio check for now.');
+        // this.log('Skipping audio check for now.');
         return Promise.resolve(null);
         // return fetchAndParseAudioDevices(this.logs?.out ?? log).then((devices) => {
         //     const cmds: Promise<any>[] = []
