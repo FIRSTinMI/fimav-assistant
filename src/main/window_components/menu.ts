@@ -244,9 +244,9 @@ export default class MenuBuilder {
         const window = new BrowserWindow({
             width: 1200,
             height: 800,
-            alwaysOnTop: true,
+            alwaysOnTop: false,
             resizable: false,
-            minimizable: false,
+            minimizable: true,
             maximizable: false,
             fullscreenable: false,
             autoHideMenuBar: true,

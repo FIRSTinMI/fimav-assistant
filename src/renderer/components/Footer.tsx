@@ -8,7 +8,7 @@ export default function AppFooter() {
 
     return (
 
-        <Space direction='horizontal' size='large' style={{ width: '100%', position: 'absolute', bottom: 0, left: 0, borderTop: '1px solid #e8e8e8', padding: '5px 0' }}>
+        <Space direction='horizontal' size='large' style={{ width: '100%', position: 'absolute', bottom: 0, left: 0, borderTop: '1px solid #e8e8e8', padding: '5px' }}>
             {status.auto_av_log && (
                 <Typography.Text>
                     AutoAV: {status.auto_av_log}
