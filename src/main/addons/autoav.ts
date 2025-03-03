@@ -8,7 +8,7 @@ import { AddonLoggers } from './addon-loggers';
 import { getCurrentEvent, signalrToElectronLog } from '../util';
 import VmixService from '../../services/VmixService';
 import Event from '../../models/Event';
-import { invokeExpectResponse } from '../window_components/signalR';
+import { invokeExpectResponse, invoke } from '../window_components/signalR';
 
 export default class AutoAV {
     private static instance: AutoAV;
@@ -103,6 +103,8 @@ export default class AutoAV {
                 this.log(`‼️ Error Stopping Recording: ${err}`);
                 this.log(err);
             });
+
+        invoke('WriteLog', 'Stopping recording');
     }
 
     /**
@@ -123,10 +125,16 @@ export default class AutoAV {
                         await VmixService.Instance.GetCurrentRecording();
                 }, 3000);
 
+                invoke(
+                    'WriteLog',
+                    `Starting recording of ${matchInfo.Level} ${matchInfo.MatchNumber} (play ${matchInfo.PlayNumber})`);
+
                 return undefined;
             })
             .catch((err) => {
                 this.log(`‼️ Error Starting Recording: ${err}`);
+
+                invoke('WriteLog', 'Failed to start recording. Unable to talk to vMix?');
             });
     }
 
@@ -227,6 +235,10 @@ export default class AutoAV {
             'matchtimerchanged',
             'plc_io_status_changed',
             'plc_match_status_changed',
+            'plc_connection_status_changed',
+            'robotversiondatachanged',
+            'azuresyncprogress',
+            'azuresyncstatuschanged'
         ];
 
         // Dummies to get log to shush
@@ -242,6 +254,11 @@ export default class AutoAV {
         this.hubConnection.onclose(() => {
             this.log('AutoAV FMS Connection Closed!');
             this.emitter.emit('info', 'FMS Connection Closed');
+            invoke('WriteLog', 'Reconnecting to FMS');
+        });
+        this.hubConnection.onclose(() => {
+            this.log('AutoAV FMS Connection Closed!');
+            invoke('WriteLog', 'Lost connection to FMS');
         });
 
         // Start connection to SignalR Hub
@@ -250,12 +267,20 @@ export default class AutoAV {
             .then(() => {
                 this.log('AutoAV FMS Connection Established!');
                 this.emitter.emit('info', 'FMS Connection Established');
+                invoke('WriteLog', 'FMS connected!');
 
                 return undefined;
             })
             .catch((err) => {
                 this.log(`AutoAV FMS Connection Failed: ${err}`);
                 this.emitter.emit('info', `FMS Connection Failed.`);
+                invoke('WriteLog', `FMS connection failed! ${err}`);
+
+                setTimeout(() => {
+                    // Restart AutoAV
+                    this.stop();
+                    this.start();
+                }, 120_000);
             });
     }
 
@@ -307,7 +332,7 @@ export default class AutoAV {
         return invokeExpectResponse<Event[]>('GetEvents', 'Events').then((events: Event[]) => {
             return getCurrentEvent(events)
         }).then((e) => {
-            return e ? e.name : null;
+            return e ? `${new Date().getFullYear()} ${e.name}` : null;
         }).catch((e) => {
             this.log(
                 `‼️ Error Fetching Event Name: ${e}`,

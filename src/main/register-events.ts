@@ -43,6 +43,7 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         if (store.get('stepsStartedAt') === 0) {
             store.set('stepsStartedAt', new Date().getTime());
         }
+        invoke('WriteLog', `Wizard: moved to step ${step}`);
     });
 
     ipcMain.on('steps:get', (event) => {
