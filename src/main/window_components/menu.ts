@@ -54,14 +54,14 @@ export default class MenuBuilder {
                     },
                     ...(dev
                         ? ([
-                              {
-                                  label: 'Quit',
-                                  role: 'quit',
-                                  click() {
-                                      quitApp();
-                                  },
-                              },
-                          ] as MenuItemConstructorOptions[])
+                            {
+                                label: 'Quit',
+                                role: 'quit',
+                                click() {
+                                    quitApp();
+                                },
+                            },
+                        ] as MenuItemConstructorOptions[])
                         : []),
                 ],
             });
@@ -163,19 +163,19 @@ export default class MenuBuilder {
                         },
                         ...(dev
                             ? ([
-                                  {
-                                      label: 'Start Recording (Dev)',
-                                      click() {
-                                          AutoAV.Instance.devStartRecording();
-                                      },
-                                  },
-                                  {
-                                      label: 'Stop Recording (Dev)',
-                                      click() {
-                                          AutoAV.Instance.devStopRecording();
-                                      },
-                                  },
-                              ] as MenuItemConstructorOptions[])
+                                {
+                                    label: 'Start Recording (Dev)',
+                                    click() {
+                                        AutoAV.Instance.devStartRecording();
+                                    },
+                                },
+                                {
+                                    label: 'Stop Recording (Dev)',
+                                    click() {
+                                        AutoAV.Instance.devStopRecording();
+                                    },
+                                },
+                            ] as MenuItemConstructorOptions[])
                             : []),
                     ],
                 },
