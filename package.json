@@ -206,7 +206,8 @@
     "publish": {
       "provider": "github",
       "owner": "firstinmi",
-      "repo": "fimav-assistant"
+      "repo": "fimav-assistant",
+      "releaseType": "release"
     }
   },
   "devEngines": {
