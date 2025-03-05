@@ -266,6 +266,7 @@ export default class AutoAV {
     public stop() {
         // Log stopping
         this.log('AutoAV Service Stopped');
+        this.emitter.emit('info', 'Service Stopped');
         // Stop the SignalR Hub connection
         this.hubConnection?.stop();
     }
