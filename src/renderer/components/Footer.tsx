@@ -8,15 +8,15 @@ export default function AppFooter() {
 
     return (
 
-        <Space direction='horizontal' size='large' style={{ width: '100%', position: 'absolute', bottom: 0, left: 0, borderTop: '1px solid #e8e8e8', padding: '5px' }}>
+        <Space direction='horizontal' size='large' style={{ width: '100%', position: 'absolute', bottom: 0, left: 0, borderTop: '1px solid #e8e8e8', padding: '5px 0', margin: '0px, 5px' }}>
             {status.auto_av_log && (
-                <Typography.Text>
+                <Typography.Text style={{margin: '0px 5px'}}>
                     AutoAV: {status.auto_av_log}
                 </Typography.Text>
             )}
 
             {!status.auto_av_log && (
-                <Typography.Text>
+                <Typography.Text style={{margin: '0px 5px'}}>
                     AutoAV Status Unknown
                 </Typography.Text>
             )}

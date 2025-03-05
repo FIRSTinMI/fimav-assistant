@@ -4,6 +4,7 @@ import Store from 'electron-store';
 import { AppConfig } from 'main/store';
 import { app } from 'electron';
 import { hostname } from 'os';
+import { EquipmentLogCategory, EquipmentLogDetails } from '../../models/EquipmentLog';
 import { SetPendingAlerts } from '../events/Alerts';
 import { signalrToElectronLog } from '../util';
 
@@ -128,6 +129,20 @@ function invokeAsync(eventName: string, ...args: any[]): Promise<any> {
     });
 }
 
+/**
+ * This function calls a SignalR event to log a message.
+ * @param message Message to log
+ * @param opts information about the log
+ * @returns void
+ */
+function invokeLog(message: string, opts: EquipmentLogDetails = { category: EquipmentLogCategory.General }): void {
+    if (signalRConnection == null) return;
+
+    signalRConnection.invoke('WriteLog', message, opts).catch((err) => {
+        log.error(`Failed to invoke 'WriteLog'`, err);
+    });
+}
+
 /*
 * This function is used to register a listener for a SignalR event.
 * @param eventName The name of the event to listen for
@@ -152,4 +167,4 @@ function dismissAlert(id: string): void {
     });
 }
 
-export { dismissAlert, invokeExpectResponse, invoke, invokeAsync, registerListener };
+export { dismissAlert, invokeExpectResponse, invoke, invokeAsync, invokeLog, registerListener };

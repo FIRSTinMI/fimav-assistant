@@ -6,6 +6,7 @@ import Alerts from './events/Alerts';
 import {
     dismissAlert,
     invoke,
+    invokeLog,
     registerListener,
 } from './window_components/signalR';
 import { getAlertsWindow } from './window_components/alertsWindow';
@@ -43,7 +44,7 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         if (store.get('stepsStartedAt') === 0) {
             store.set('stepsStartedAt', new Date().getTime());
         }
-        invoke('WriteLog', `Wizard: moved to step ${step}`);
+        invokeLog(`Wizard: moved to step ${step}`);
     });
 
     ipcMain.on('steps:get', (event) => {
