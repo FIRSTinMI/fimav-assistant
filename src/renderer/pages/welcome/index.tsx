@@ -37,11 +37,18 @@ function Welcome() {
     return (
         <>
             <StepManager />
-            <Space direction="vertical" style={{ textAlign: 'center' }}>
+            <Space direction="vertical" style={{ textAlign: 'center', width: '100%', height: '100%' }}>
                 <img
                     className="logo-bounce"
                     src={FiMLogo}
-                    style={{ width: '30%', height: '30%' }}
+                    style={{
+                        maxWidth: '30%', 
+                        maxHeight: '80%', 
+                        height: '100%',
+                        marginTop: '5%',
+                        WebkitFilter: "drop-shadow(0px 0px 1px #FFFFFF",
+                        filter: "drop-shadow(0px 0px 1px #FFFFFF"
+                    }}
                     alt="FIRST in Michigan logo"
                 />
                 <Typography.Title level={1} style={{ marginTop: 0 }}>

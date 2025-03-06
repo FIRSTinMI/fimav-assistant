@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, theme } from 'antd';
 import './App.css';
 import AppRoutes from './AppRoutes';
 import StatusContext, { StatusContextType } from './hooks/status_state';
@@ -24,6 +24,7 @@ export default function App() {
     return (
         <ConfigProvider
             theme={{
+                algorithm: theme.darkAlgorithm,
                 token: {
                     // colorPrimary: '#00b96b',
                 },
@@ -32,7 +33,7 @@ export default function App() {
             <StatusContext.Provider value={contextValue}>
                 <BackendStatusSync />
 
-                <div style={{ height: 'calc(100vh - 40px)', overflowY: 'auto' }}>
+                <div className="pretty-scroll" style={{ height: 'calc(100vh - 40px)', overflowY: 'auto' }}>
                     <AppRoutes />
                 </div>
 
