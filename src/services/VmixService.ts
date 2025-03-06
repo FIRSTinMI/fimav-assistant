@@ -1,6 +1,8 @@
 import log from 'electron-log';
 import { XMLParser } from 'fast-xml-parser';
-import { invokeExpectResponse } from '../main/window_components/signalR';
+import EventEmitter from 'events';
+import { EquipmentLogCategory, EquipmentLogType } from '../models/EquipmentLog';
+import { invokeLog } from '../main/window_components/signalR';
 import { getStore } from '../main/store';
 
 type VmixSettings = {
@@ -9,10 +11,18 @@ type VmixSettings = {
     password: string;
 };
 
+type StreamInfo = {
+    index: number;
+    rtmpUrl: string;
+    rtmpKey: string;
+};
+
 export default class VmixService {
     private static instance: VmixService;
 
     private settings: VmixSettings;
+
+    private emitter = new EventEmitter();
 
     constructor(settings?: VmixSettings) {
         if (settings) {
@@ -49,21 +59,53 @@ export default class VmixService {
         });
     }
 
-    async SetStreamInfo(): Promise<void> {
-        type StreamInfo = {
-            index: number;
-            rtmpUrl: string;
-            rtmpKey: string;
-        };
-
-        log.info('Setting stream info');
-
-        let streamInfo: StreamInfo[] = await invokeExpectResponse(
-            'GetStreamInfo',
-            'StreamInfo'
+    async StartStream(streamNumber?: number): Promise<void> {
+        ;
+        const rsp = await fetch(
+            `${this.settings.baseUrl}?Function=StartStreaming&Value=${streamNumber ?? ''}`,
+            {
+                headers: this.createHeaders(),
+            }
         );
-        streamInfo = streamInfo.filter(info => info.rtmpKey && info.rtmpUrl);
+
+        if (!rsp.ok) {
+            throw new Error(`Failed to start stream: ${await rsp.text()}`);
+        }
+    }
+
+    async StopStream(streamNumber?: number): Promise<void> {
+        ;
+        const rsp = await fetch(
+            `${this.settings.baseUrl}?Function=StopStreaming&Value=${streamNumber ?? ''}`,
+            {
+                headers: this.createHeaders(),
+            }
+        );
+
+        if (!rsp.ok) {
+            throw new Error(`Failed to stop stream: ${await rsp.text()}`);
+        }
+    }
+
+    async SetStreamInfo(sInfo: StreamInfo[]): Promise<void> {
+        const totalSupportedStreams = 3;
+        const streamInfo = sInfo.filter(info => info.rtmpKey && info.rtmpUrl);
+
+        // whatever index 0-totalSupportedStreams is missing we'll add it
+        if (streamInfo.length < totalSupportedStreams) {
+            for (let i = 0; i < totalSupportedStreams; i += 1) {
+                if (!streamInfo.find(info => info.index === i)) {
+                    streamInfo.push({
+                        index: i,
+                        rtmpUrl: '',
+                        rtmpKey: ''
+                    });
+                }
+            }
+        }
+
         log.info(streamInfo);
+        invokeLog(`Setting ${streamInfo.length} streams in vMix`, { category: EquipmentLogCategory.Vmix_General, extraInfo: { payloads: streamInfo }, severity: EquipmentLogType.Info });
 
         const setStreamInfo = async (info: StreamInfo): Promise<void> => {
             info.rtmpUrl ??= '';
@@ -83,24 +125,20 @@ export default class VmixService {
             );
         };
 
-        for (let idx = 0; idx < 3; idx += 1) {
-            // We want to overwrite the index from the server so that we always start populating
-            // the first stream
-            let info = streamInfo[idx];
-            if (info) {
-                info.index = idx;
-            } else {
-                info = {
-                    index: idx,
-                    rtmpUrl: '',
-                    rtmpKey: ''
-                }
-            }
-            // We want to explicitly run these operations in order, we cannot make use of parallelization
-            // TODO: Promise chain these so we can get out of the loop
-            // eslint-disable-next-line no-await-in-loop
-            await setStreamInfo(info);
-        }
+        const chain = streamInfo.reduce(async (prev, info) => {
+            await prev;
+            return setStreamInfo(info);
+        }, Promise.resolve());
+
+        chain.then(() => {
+            this.emitter.emit('streamInfoUpdated', true);
+            return null;
+        }).catch((err) => {
+            this.emitter.emit('streamInfoUpdated', false);
+            log.error('Failed to set stream info', err);
+        });
+
+        return chain;
     }
 
     async AddBrowserInput(url: string): Promise<void> {
@@ -149,6 +187,10 @@ export default class VmixService {
 
     getUrl(): string {
         return this.settings.baseUrl;
+    }
+
+    get events(): EventEmitter {
+        return this.emitter;
     }
 
     public static get Instance(): VmixService {

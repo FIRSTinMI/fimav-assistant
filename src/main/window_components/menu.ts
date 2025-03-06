@@ -14,6 +14,7 @@ import createAlertsWindow, { getAlertsWindow } from './alertsWindow';
 import { quitApp } from '../main'; // eslint-disable-line import/no-cycle
 import VmixService from '../../services/VmixService';
 import AutoAV from '../addons/autoav';
+import { invoke } from './signalR';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
     selector?: string;
@@ -22,7 +23,7 @@ interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
 
 export default class MenuBuilder {
     mainWindow: BrowserWindow;
-    
+
     addons: Addons;
 
     constructor(mainWindow: BrowserWindow, addons: Addons) {
@@ -138,21 +139,31 @@ export default class MenuBuilder {
                         {
                             label: 'Set Stream Keys',
                             click: async () => {
-                                try {
-                                    await VmixService.Instance.SetStreamInfo();
+                                // Set a timeout for the stream keys, if we don't get a response in 10 seconds, show a message box 
+                                const timeout = setTimeout(() => {
                                     dialog.showMessageBox({
                                         message:
-                                            'Successfully set vMix streaming locations',
+                                            'Failed to set stream keys: Timed out',
                                         title: 'vMix Streaming',
                                         type: 'info',
                                     });
-                                } catch (e: any) {
+                                }, 10000);
+
+                                VmixService.Instance.events.once('streamInfoUpdated', (success: boolean) => {
+                                    // Clear the timeout  
+                                    clearTimeout(timeout);
+                                    
+                                    // Show a message
                                     dialog.showMessageBox({
-                                        message: `Failed to set streaming locations: ${e.toString()}`,
+                                        message:
+                                            success ? 'Successfully set vMix streaming locations' : 'Failed to set streaming locations. Check the log for more details.',
                                         title: 'vMix Streaming',
                                         type: 'info',
                                     });
-                                }
+                                });
+
+                                // This will trigger SignalR to send us the stream info, which is being listened for in register-events.ts
+                                invoke('GetStreamInfo');
                             },
                         },
                         {

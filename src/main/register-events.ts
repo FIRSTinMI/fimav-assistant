@@ -1,6 +1,8 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import log from 'electron-log';
 import HWPingResponse from 'models/HWPingResponse';
+import { EquipmentLogCategory, EquipmentLogType } from '../models/EquipmentLog';
+import VmixService from '../services/VmixService';
 import HWCheck, { enableDhcp } from './events/HWCheck';
 import Alerts from './events/Alerts';
 import {
@@ -113,6 +115,59 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         }
 
         // TODO: Handle ending the current event and starting the next if the computer is never rebooted
+    });
+
+    // Listen for stream start/stop events
+    registerListener('StartStream', (streamNumber?: number) => {
+        const all = streamNumber === undefined;
+        invokeLog(`Starting ${!all ? `stream ${streamNumber}` : 'all streams'}`);
+
+        // Start the stream
+        VmixService.Instance.StartStream(streamNumber).then(() => {
+            invokeLog(`${!all ? `Stream ${streamNumber}` : 'All streams'} started`);
+            return null;
+        }).catch((err) => {
+            log.error(`Failed to start stream`, err);
+            invokeLog(`Failed to start ${!all ? `stream ${streamNumber}` : 'all streams'}`, {
+                severity: EquipmentLogType.Error,
+                category: EquipmentLogCategory.General,
+                extraInfo: err
+            });
+        });
+    });
+
+    // Listen for stream start/stop events
+    registerListener('StopStream', (streamNumber?: number) => {
+        const all = streamNumber === undefined;
+        invokeLog(`Stopping ${!all ? `stream ${streamNumber}` : 'all streams'}`);
+
+        // Start the stream
+        VmixService.Instance.StopStream(streamNumber).then(() => {
+            invokeLog(`${!all ? `Stream ${streamNumber}` : 'All streams'} stopped`);
+            return null;
+        }).catch((err) => {
+            log.error(`Failed to stop stream`, err);
+            invokeLog(`Failed to stop ${!all ? `stream ${streamNumber}` : 'all streams'}`, {
+                severity: EquipmentLogType.Error,
+                category: EquipmentLogCategory.General,
+                extraInfo: err
+            });
+        });
+    });
+
+    // Listen for stream start/stop events
+    registerListener('StreamInfo', (info) => {
+        VmixService.Instance.SetStreamInfo(info as any).then(() => {
+            invokeLog(`Stream info updated`);
+            return null;
+        }).catch((err) => {
+            log.error(`Failed to update stream info`, err);
+            invokeLog(`Failed to update stream info`, {
+                severity: EquipmentLogType.Error,
+                category: EquipmentLogCategory.General,
+                extraInfo: err
+            });
+        });
     });
 
     // Register a emitter listener for the hwping response.  Any time the hwping service updates, we'll send the updated list to the renderer

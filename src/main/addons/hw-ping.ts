@@ -2,6 +2,8 @@ import log from 'electron-log';
 import ping, { PingResponse } from 'ping';
 import HWPingResponse from 'models/HWPingResponse';
 import { EventEmitter } from 'stream';
+import { EquipmentLogCategory, EquipmentLogType } from '../../models/EquipmentLog';
+import { invokeLog } from '../window_components/signalR';
 import { getCartNumberFromHostname } from '../util';
 import { AddonLoggers } from './addon-loggers';
 // import { fetchAndParseAudioDevices } from '../events/HWCheck';
@@ -94,30 +96,35 @@ export default class HWPing {
             case 0:
                 if (this.currentState.switch !== out.alive) {
                     this.currentState.switch = out.alive;
+                    this.remoteLog('Switch', out.alive);
                     didUpdate = true;
                 }
                 break;
             case 1:
                 if (this.currentState.mixer !== out.alive) {
                     this.currentState.mixer = out.alive;
+                    this.remoteLog('Mixer', out.alive);
                     didUpdate = true;
                 }
                 break;
             case 2:
                 if (this.currentState.camera1 !== out.alive) {
                     this.currentState.camera1 = out.alive;
+                    this.remoteLog('Camera 1', out.alive);
                     didUpdate = true;
                 }
                 break;
             case 3:
                 if (this.currentState.camera2 !== out.alive) {
                     this.currentState.camera2 = out.alive;
+                    this.remoteLog('Camera 2', out.alive);
                     didUpdate = true;
                 }
                 break;
             case 4:
                 if (this.currentState.internet !== out.alive) {
                     this.currentState.internet = out.alive;
+                    this.remoteLog('Internet', out.alive);
                     didUpdate = true;
                 }
                 break;
@@ -133,6 +140,16 @@ export default class HWPing {
             // Emit the change
             this.emitter.emit('hw-change', this.currentState);
         }
+    }
+
+    // eslint-disable-next-line class-methods-use-this
+    private remoteLog(device: string, status: boolean) {
+        const severity = status ? EquipmentLogType.Info : EquipmentLogType.Warn;
+
+        invokeLog(`${device} is ${status ? 'online' : 'offline'}`, {
+            severity,
+            category: EquipmentLogCategory.HWPing_General,
+        });
     }
 
     // Audio Promises
