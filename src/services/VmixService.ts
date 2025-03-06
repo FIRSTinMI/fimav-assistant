@@ -105,7 +105,11 @@ export default class VmixService {
         }
 
         log.info(streamInfo);
-        invokeLog(`Setting ${streamInfo.length} streams in vMix`, { category: EquipmentLogCategory.Vmix_General, extraInfo: { payloads: streamInfo }, severity: EquipmentLogType.Info });
+        invokeLog(`Setting ${streamInfo.length} streams in vMix`, { 
+            category: EquipmentLogCategory.Vmix_General, 
+            extraInfo: { payloads: streamInfo.map(k => ({ i: k.index, url: k.rtmpUrl })) }, 
+            severity: EquipmentLogType.Info 
+        });
 
         const setStreamInfo = async (info: StreamInfo): Promise<void> => {
             info.rtmpUrl ??= '';
