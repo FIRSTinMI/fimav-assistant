@@ -370,7 +370,7 @@ export default class AutoAV {
 
     // Set the event name
     public setEventName(eventName: string) {
-        this.currentEventName = eventName;
+        this.currentEventName = `${new Date().getFullYear()} ${eventName}`;
     }
 
     public static get Instance(): AutoAV {
