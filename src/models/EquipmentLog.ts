@@ -13,6 +13,8 @@ export enum EquipmentLogCategory {
     AutoAV_Recording = "autoav_recording",
     AutoAV_FMS = "autoav_fms",
     AutoAV_General = "autoav_general",
+    HWPing_General = "hwping_general",
+    Vmix_General = "vmix_general",
 }
 
 export interface EquipmentLogDetails {
