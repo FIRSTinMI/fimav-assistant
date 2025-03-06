@@ -167,7 +167,8 @@ export default class AutoAV {
                 this.logFMS(
                     `Match Status Changed: ${this.lastState ? this.lastState.MatchState : 'Unknown'
                     } -> ${info.MatchState} for ${info.Level} Match ${info.MatchNumber
-                    } (Play #${info.PlayNumber})`
+                    } (Play #${info.PlayNumber})`,
+                    info, EquipmentLogType.Debug
                 );
 
                 // Update
@@ -198,7 +199,7 @@ export default class AutoAV {
 
         // Register listener for the "SystemConfigValueChanged" event (video switch))
         this.hubConnection.on('SystemConfigValueChanged', async (configKey) => {
-            this.logFMS(`Got a config value change`, {key: configKey}, EquipmentLogType.Debug);
+            this.logFMS(`Got a config value change`, { key: configKey }, EquipmentLogType.Debug);
 
             // VideoSwitchOption
             if (configKey === 'VideoSwitchOption') {
