@@ -56,7 +56,7 @@ export default class AutoAV {
     private async stopRecording() {
         // Check if we're recording
         if (!(await VmixService.Instance.isRecording())) {
-            this.logRecording('🟥 Not Recording');
+            this.logRecording('🟥 Not Recording', undefined, EquipmentLogType.Debug);
             return;
         }
 
