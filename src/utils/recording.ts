@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import path from 'path';
-import FMSMatchStatus from '../models/FMSMatchState';
 import Event from 'models/Event';
+import FMSMatchStatus from 'models/FMSMatchState';
 
 export default async function attemptRename(
     event: Event | null,
@@ -25,25 +25,28 @@ export default async function attemptRename(
             const eventCode = event?.eventCode ?? event?.name ?? 'Unknown_Event';
 
             // Build the file name
-            let match = `zz_${matchStatus.Level} ${matchStatus.MatchNumber}`;
+            let match = '';
             switch (matchStatus.Level) {
-                case 'Qualification':
-                    match = `QM${matchStatus.MatchNumber}`;
-                    break;
-                case 'Playoff':
-                    // TODO: Make this more resilient to playoff types other than 8-alliance double elim
-                    if (matchStatus.MatchNumber >= 14) {
-                        match = `F1M${matchStatus.MatchNumber - 13}`;
-                    } else {
-                        match = `SF${matchStatus.MatchNumber}M1`;
-                    }
-                    break;
-                case 'Practice':
-                    match = `zz_PR${matchStatus.MatchNumber}`;
-                    break;
-                case 'Match Test':
-                    match = `zz_TM${matchStatus.MatchNumber}`;
-                    break;
+            case 'Qualification':
+                match = `QM${matchStatus.MatchNumber}`;
+                break;
+            case 'Playoff':
+                // TODO: Make this more resilient to playoff types other than 8-alliance double elim
+                if (matchStatus.MatchNumber >= 14) {
+                    match = `F1M${matchStatus.MatchNumber - 13}`;
+                } else {
+                    match = `SF${matchStatus.MatchNumber}M1`;
+                }
+                break;
+            case 'Practice':
+                match = `zz_PR${matchStatus.MatchNumber}`;
+                break;
+            case 'Match Test':
+                match = `zz_TM${matchStatus.MatchNumber}`;
+                break;
+            default:
+                match = `zz_${matchStatus.Level} ${matchStatus.MatchNumber}`;
+                break;
             }
             const play =
                 matchStatus.PlayNumber > 1
