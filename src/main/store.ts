@@ -12,6 +12,9 @@ export type AppConfig = {
         username: string;
         password: string
     };
+    autoAv: {
+        fileNameMode: 'in-season' | 'off-season'
+    }
 };
 
 export function createStore(): Store<AppConfig> {
@@ -57,6 +60,15 @@ export function createStore(): Store<AppConfig> {
                         default: 'pass'
                     }
                 }
+            },
+            autoAv: {
+                type: 'object',
+                properties: {
+                    fileNameMode: {
+                        type: 'string',
+                        default: 'in-season'
+                    }
+                }
             }
         },
         migrations: {
@@ -80,6 +92,9 @@ export function createStore(): Store<AppConfig> {
                     username: 'user',
                     password: 'pass'
                 });
+            },
+            '0.0.29': (store) => {
+                store.set('autoAv.fileNameMode', 'in-season');
             }
         },
     }) as Store<AppConfig>;
