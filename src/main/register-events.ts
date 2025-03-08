@@ -108,11 +108,7 @@ export default function registerAllEvents(window: BrowserWindow | null) {
 
         // Find the event that is current running (date is between start and end)
         const currentEvent = await getCurrentEvent(events);
-        if (currentEvent) {
-            AutoAV.Instance.setEventName(currentEvent.name);
-        } else {
-            AutoAV.Instance.setEventName('');
-        }
+        AutoAV.Instance.setEvent(currentEvent);
 
         // TODO: Handle ending the current event and starting the next if the computer is never rebooted
     });
