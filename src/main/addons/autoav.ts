@@ -33,7 +33,7 @@ export default class AutoAV {
     private currentEvent: Event | null = null;
 
     // Track whether or not we're recording (rather than someone in vMix clicking record)
-    private weAreRecording = false;
+    public weAreRecording = false;
 
     // Track if we're already scheduled to stop recording
     private willStopRecording = false;
