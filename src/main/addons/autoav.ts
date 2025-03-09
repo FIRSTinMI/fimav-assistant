@@ -121,7 +121,7 @@ export default class AutoAV {
                 return undefined;
             })
             .catch((err) => {
-                this.logRecording(`‼️ Error Starting Recording. Is Vmix at ${VmixService.Instance.getUrl}?`, err, EquipmentLogType.Error);
+                this.logRecording(`‼️ Error Starting Recording. Is Vmix at ${VmixService.Instance.getUrl()}?`, err, EquipmentLogType.Error);
             });
     }
 
