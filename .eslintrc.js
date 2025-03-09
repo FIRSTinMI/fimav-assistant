@@ -11,7 +11,8 @@ module.exports = {
         'prettier/prettier': 'off',
         indent: ['warn', 4],
         'no-use-before-define': 'off',
-        'global-require': 'off'
+        'global-require': 'off',
+        'no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }]
     },
     parserOptions: {
         ecmaVersion: 2020,

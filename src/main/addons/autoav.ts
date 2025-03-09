@@ -30,10 +30,10 @@ export default class AutoAV {
     private currentFile: string | null = null;
 
     // Current event name
-    private currentEventName: string | null = null;
+    private currentEvent: Event | null = null;
 
     // Track whether or not we're recording (rather than someone in vMix clicking record)
-    private weAreRecording = false;
+    public weAreRecording = false;
 
     // Track if we're already scheduled to stop recording
     private willStopRecording = false;
@@ -56,7 +56,7 @@ export default class AutoAV {
     private async stopRecording() {
         // Check if we're recording
         if (!(await VmixService.Instance.isRecording())) {
-            this.logRecording('🟥 Not Recording');
+            this.logRecording('🟥 Not Recording', undefined, EquipmentLogType.Debug);
             return;
         }
 
@@ -70,22 +70,19 @@ export default class AutoAV {
                 if (!this.lastMatchStartData) return undefined;
 
                 // If we don't have an event name, try to get it
-                if (
-                    !this.currentEventName ||
-                    this.currentEventName.length === 0
-                ) {
+                if (!this.currentEvent) {
                     this.logRecording(
-                        'ℹ Event Name not Present. Fetching current event name...',
+                        'ℹ Event not Present. Fetching current event...',
                         undefined,
                         EquipmentLogType.Warn,
                     );
-                    this.currentEventName = await this.fetchEventName();
+                    this.currentEvent = await this.fetchEvent();
                 }
 
                 // Attempt to rename the file
                 try {
                     const filename = await attemptRename(
-                        this.currentEventName ?? 'Unknown Event',
+                        this.currentEvent,
                         this.currentFile,
                         this.lastMatchStartData
                     );
@@ -124,7 +121,7 @@ export default class AutoAV {
                 return undefined;
             })
             .catch((err) => {
-                this.logRecording(`‼️ Error Starting Recording. Is Vmix at ${VmixService.Instance.getUrl}?`, err, EquipmentLogType.Error);
+                this.logRecording(`‼️ Error Starting Recording. Is Vmix at ${VmixService.Instance.getUrl()}?`, err, EquipmentLogType.Error);
             });
     }
 
@@ -307,11 +304,11 @@ export default class AutoAV {
     }
 
     // Fetch the event name
-    private async fetchEventName(): Promise<string | null> {
+    private async fetchEvent(): Promise<Event | null> {
         return invokeExpectResponse<Event[]>('GetEvents', 'Events').then((events: Event[]) => {
             return getCurrentEvent(events)
         }).then((e) => {
-            return e ? `${new Date().getFullYear()} ${e.name}` : null;
+            return e ?? null;
         }).catch((e) => {
             this.log(
                 `‼️ Error Fetching Event Name`,
@@ -369,8 +366,8 @@ export default class AutoAV {
     }
 
     // Set the event name
-    public setEventName(eventName: string) {
-        this.currentEventName = `${new Date().getFullYear()} ${eventName}`;
+    public setEvent(event: Event | null) {
+        this.currentEvent = event;
     }
 
     public static get Instance(): AutoAV {
