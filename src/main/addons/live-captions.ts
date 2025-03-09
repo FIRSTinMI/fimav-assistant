@@ -41,10 +41,12 @@ export default class LiveCaptions {
                 );
                 execSync(`taskkill /pid ${pid} /f /t`);
             }
+        } catch(err) {
+            // Ignore any errors
+            this.logs.out.warn('Unable to stop existing live captions processes', err);
+        } finally {
             this.running = false;
             this.process = null;
-        } catch {
-            // Ignore any errors
         }
     }
 
@@ -147,7 +149,7 @@ export default class LiveCaptions {
             this.process.stdout.on('data', (data) => {
                 this.logs.out.info(data.toString());
             });
-            this.process.stdout.on('data', (data) => {
+            this.process.stderr.on('data', (data) => {
                 this.logs.err.error(data.toString());
             });
 
