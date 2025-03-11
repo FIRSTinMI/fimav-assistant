@@ -1,6 +1,6 @@
 {
   "description": "AV Assistant application for FiM AV Voluenteers",
-  "version": "0.0.29",
+  "version": "2025.7.0",
   "name": "us.fimav.assistant",
   "keywords": [
     "electron",
