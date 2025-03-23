@@ -39,14 +39,14 @@ function InternetSetup({ nextStep, previousStep }: Steppable) {
                 </Typography.Title>
 
                 <Typography.Text>
-                    Please plug in the venue ethernet into port <b>1</b> on the
-                    Switch on the rear of the AV Cart (Upper-left most port, highlighted below)
+                    Please plug in the venue ethernet into port <b>7</b> on the
+                    Switch on the rear of the AV Cart (4th column, top row, highlighted below)
                 </Typography.Text>
 
                 <Flex gap="small" align="center" vertical>
                     <img
                         src={SwitchInternetPort}
-                        alt="Switch Port 1"
+                        alt="Switch Port 7"
                         style={{ width: '30%' }}
                     />
                 </Flex>
