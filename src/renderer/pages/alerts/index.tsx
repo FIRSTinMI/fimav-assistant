@@ -70,12 +70,9 @@ function Alerts() {
                     {alerts.alerts.map((alert) => (
                         <div key={alert.id}>
                             <div
-                                style={{
-                                    color: 'white !important'
-                                }}
                                 /* eslint-disable react/no-danger */
                                 dangerouslySetInnerHTML={{
-                                    __html: alert.content,
+                                    __html: `<div style="color: white; font-family: sans-serif;">${alert.content}</div>`,
                                 }}
                                 /* eslint-enable react/no-danger */
                             />
