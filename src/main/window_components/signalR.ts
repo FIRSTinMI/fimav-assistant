@@ -1,4 +1,4 @@
-import { HubConnection, HubConnectionBuilder } from '@microsoft/signalr';
+import { HubConnection, HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
 import log from 'electron-log';
 import Store from 'electron-store';
 import { AppConfig } from 'main/store';
@@ -15,8 +15,9 @@ export default function setupSignalR(
     createAlertsWindowCallback: () => void
 ): Promise<void> {
     return new Promise((resolve, reject) => {
-        if (signalRConnection != null)
+        if (signalRConnection != null && signalRConnection.state === HubConnectionState.Connected) {
             throw new Error('SignalR has already been initialized');
+        }
 
         signalRConnection = new HubConnectionBuilder()
             .withUrl(store.get('signalrUrl') as string, {
@@ -52,15 +53,23 @@ export default function setupSignalR(
             if (newAlerts.length > 0) createAlertsWindowCallback();
         });
 
+        log.info('Connecting to admin with SignalR...');
         signalRConnection
             .start()
             .then(() => {
-                log.info('Connection to SignalR established');
+                log.info('Connection to admin SignalR established');
                 sendAppInfo();
                 return resolve();
             })
             .catch((err) => {
-                log.error('Error connecting to SignalR', err);
+                log.error('Error connecting to admin SignalR', err);
+
+                setTimeout(() => {
+                    signalRConnection?.stop().finally(() => {
+                        setupSignalR(store, createAlertsWindowCallback);
+                    });
+                }, 30_000);
+
                 return reject(err);
             });
     });
