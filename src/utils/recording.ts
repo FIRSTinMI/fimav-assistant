@@ -2,13 +2,13 @@ import * as fs from 'fs';
 import path from 'path';
 import Event from 'models/Event';
 import FMSMatchStatus from 'models/FMSMatchState';
-import { getStore } from 'main/store';
+import { getStore } from '../main/store';
 
 export type FileNameMode = 'in-season' | 'off-season';
 
 const fileNameBuilders: Record<FileNameMode, (_event: Event | null, _matchStatus: FMSMatchStatus) => string> = {
     'in-season': (event, matchStatus) => {
-        const eventCode = event?.eventCode ?? event?.name ?? 'Unknown_Event';
+        const eventCode = event?.code ?? event?.name ?? 'Unknown_Event';
 
         // Build the file name
         let match = '';
@@ -66,7 +66,14 @@ export default async function attemptRename(
                 return;
             }
             
-            const newFileName = fileNameBuilders[getStore().get('autoAv.fileNameMode', 'in-season')](event, matchStatus);
+            let builder: FileNameMode = getStore().get('autoAv.fileNameMode', 'in-season');
+            if (event?.isOfficial === false) {
+                builder = 'off-season';
+            } else if (event?.isOfficial === true) {
+                builder = 'in-season';
+            }
+
+            const newFileName = fileNameBuilders[builder](event, matchStatus);
 
             // Check if event name folder exists (videoLocation has the file name at the end, so we must "go up" one directory)
             const eventFolder = path.resolve(videoLocation, '../', `${new Date().getFullYear()} ${event?.name ?? 'Unknown Event'}`);

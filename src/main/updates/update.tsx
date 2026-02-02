@@ -1,6 +1,6 @@
 import { autoUpdater } from 'electron-updater';
 import log from 'electron-log';
-import AutoAV from 'main/addons/autoav';
+import AutoAV from '../addons/autoav';
 
 // eslint-disable-next-line no-undef
 let canRestartInterval: NodeJS.Timer | undefined;

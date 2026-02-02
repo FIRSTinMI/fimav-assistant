@@ -144,7 +144,7 @@ export const getCurrentEvent = async (
     if (events.length > 0) {
         const now = new Date();
         const currentEvent = events.find(
-            (e) => now >= new Date(e.start) && now <= new Date(e.end)
+            (e) => now >= new Date(e.startTime) && now <= new Date(e.endTime)
         );
         if (currentEvent) {
             return Promise.resolve(currentEvent);
