@@ -1,10 +1,17 @@
 type Event = {
-    end: string,
-    eventCode: string,
-    eventKey: string,
+    id: string,
+    seasonId: number,
+    key: string,
+    code: string,
     name: string,
-    start: string,
-    state: string
+    isOfficial: boolean,
+    truckRouteId: number,
+    startTime: string,
+    endTime: string,
+    timeZone: string,
+    syncAsOf: null,
+    status: string,
+    season: null
 }
 
 export default Event;

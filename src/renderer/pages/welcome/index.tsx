@@ -17,10 +17,11 @@ function Welcome() {
     useEffect(() => {
         // Fire off HW check and register listener
         window.electron.ipcRenderer.on('new-event-info', (events: Event[]) => {
+            console.log(events);
             const current = events.filter(
                 (e) =>
-                    new Date(e.start) <= new Date() &&
-                    new Date(e.end) >= new Date()
+                    new Date(e.startTime) <= new Date() &&
+                    new Date(e.endTime) >= new Date()
             );
             if (current.length > 0) {
                 setCurrentEvent(current[0]);
