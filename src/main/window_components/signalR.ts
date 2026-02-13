@@ -157,7 +157,7 @@ function invokeLog(message: string, opts: EquipmentLogDetails = { category: Equi
 * @param eventName The name of the event to listen for
 * @param listener The function to call when the event is received
 */
-function registerListener<t>(eventName: string, listener: (response: t) => void): void { // eslint-disable-line
+function registerListener<t>(eventName: string, listener: (response: t) => (Promise<any> | void)): void { // eslint-disable-line
     if (signalRConnection == null) return;
 
     signalRConnection.on(eventName, listener);

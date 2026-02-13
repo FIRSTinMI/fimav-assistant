@@ -166,6 +166,7 @@ export default class VmixService {
     async GetBase(): Promise<any> {
         return fetch(`${this.settings.baseUrl}`, {
             headers: this.createHeaders(),
+            signal: AbortSignal.timeout(5_000)
         })
             .then((response) => response.text())
             .then((xml) => {

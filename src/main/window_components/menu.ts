@@ -172,6 +172,12 @@ export default class MenuBuilder {
                                 MenuBuilder.addLiveCapInput();
                             },
                         },
+                        {
+                            label: 'Add Audience Display (Web) input',
+                            click() {
+                                MenuBuilder.addAudienceDisplayWebInput();
+                            },
+                        },
                         ...(dev
                             ? ([
                                 {
@@ -292,6 +298,37 @@ export default class MenuBuilder {
                     await VmixService.Instance.RenameInput(
                         input.key,
                         'Live Captions'
+                    );
+                    found = true;
+                }
+            });
+        } catch (err) {
+            // Sadness
+        }
+    }
+
+    static async addAudienceDisplayWebInput() {
+        try {
+            // Add input to vMix
+            await VmixService.Instance.AddBrowserInput(
+                'http://10.0.100.5/AudienceDisplay'
+            );
+
+            // Get inputs
+            const parsed = await VmixService.Instance.GetBase();
+
+            // Find the input we just added
+            let found = false;
+            parsed.vmix.inputs.input.forEach(async (input: any) => {
+                if (
+                    !found &&
+                    input.type === 'Browser' &&
+                    input.title === 'Browser FMS - Audience Display'
+                ) {
+                    // Rename it
+                    await VmixService.Instance.RenameInput(
+                        input.key,
+                        'Audience Display'
                     );
                     found = true;
                 }
