@@ -323,7 +323,7 @@ export default class MenuBuilder {
                 if (
                     !found &&
                     input.type === 'Browser' &&
-                    input.title === 'Browser FMS - Audience Display'
+                    input.title === 'Browser 10.0.100.5'
                 ) {
                     // Rename it
                     await VmixService.Instance.RenameInput(

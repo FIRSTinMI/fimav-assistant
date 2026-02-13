@@ -166,8 +166,9 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         });
     });
     
-    registerListener('GetVmixConfig', () => {
-        return VmixService.Instance.GetBase();
+    registerListener('GetVmixConfig', async () => {
+        const resp = await VmixService.Instance.GetBase();
+        return JSON.stringify(resp);
     });
 
     // Register a emitter listener for the hwping response.  Any time the hwping service updates, we'll send the updated list to the renderer
