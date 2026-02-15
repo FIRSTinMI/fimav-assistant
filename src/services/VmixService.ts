@@ -163,6 +163,23 @@ export default class VmixService {
         );
     }
 
+    async SetInputAudioAlwaysOn(guid: string): Promise<void> {
+        // Don't mix on transition in/out
+        await fetch(
+            `${this.settings.baseUrl}?Function=AudioAutoOff&Input=${guid}`,
+            {
+                headers: this.createHeaders(),
+            }
+        );
+        // Ensure unmuted
+        await fetch(
+            `${this.settings.baseUrl}?Function=AudioOn&Input=${guid}`,
+            {
+                headers: this.createHeaders(),
+            }
+        );
+    }
+
     async GetBase(): Promise<any> {
         return fetch(`${this.settings.baseUrl}`, {
             headers: this.createHeaders(),
