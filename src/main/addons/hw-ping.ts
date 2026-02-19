@@ -289,25 +289,10 @@ export default class HWPing {
 
             if (lower.includes('field')) {
                 fieldIp = ipv4?.address;
-                this.log(
-                    `IP check: Field VLAN interface "${name}" -> ${
-                        fieldIp ?? 'no IPv4'
-                    }`
-                );
             } else if (lower.includes('av')) {
                 avIp = ipv4?.address;
-                this.log(
-                    `IP check: AV VLAN interface "${name}" -> ${
-                        avIp ?? 'no IPv4'
-                    }`
-                );
             } else if (lower.includes('internet') || lower.includes('vlan10')) {
                 internetIp = ipv4?.address;
-                this.log(
-                    `IP check: Internet VLAN interface "${name}" -> ${
-                        internetIp ?? 'no IPv4'
-                    }`
-                );
             }
 
             // Tailscale: by name or by IP range (100.64.0.0/10)
@@ -317,11 +302,6 @@ export default class HWPing {
             ) {
                 tailscaleFound = true;
                 tailscaleIp = ipv4?.address;
-                this.log(
-                    `IP check: Tailscale interface "${name}" -> ${
-                        tailscaleIp ?? 'no IPv4'
-                    }`
-                );
             }
         });
 
@@ -381,14 +361,6 @@ export default class HWPing {
                 }). Check Tailscale connection.`
             );
         }
-
-        this.log(
-            `IP check result: ${errors.length} error(s), ${warnings.length} warning(s)`
-        );
-        if (errors.length)
-            this.log(`IP check errors: ${errors.join(' | ')}`, 'err');
-        if (warnings.length)
-            this.log(`IP check warnings: ${warnings.join(' | ')}`);
 
         return { errors, warnings };
     }
