@@ -235,20 +235,21 @@ export default class HWPing {
     }
 
     // Add a listener
-    // eslint-disable-next-line
+    /* eslint-disable */
     public on(
         event: 'hw-change',
         listener: (arg: HWPingResponse) => void
     ): void;
-    // eslint-disable-next-line
+
     public on(
         event: 'ip-config-changed',
         listener: (arg: IpConfigState) => void
     ): void;
-    // eslint-disable-next-line
+
     public on(event: string, listener: (arg: any) => void) {
         this.emitter.on(event, listener);
     }
+    /* eslint-enable */
 
     // Run IP config check and emit if changed
     private runIpCheck() {

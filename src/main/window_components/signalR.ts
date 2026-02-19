@@ -176,7 +176,7 @@ function invokeLog(
  */
 function registerListener<t>(
     eventName: string,
-    listener: (response: t) => Promise<any> | void
+    listener: (_response: t) => Promise<any> | void
 ): void {
     // eslint-disable-line
     if (signalRConnection == null) return;

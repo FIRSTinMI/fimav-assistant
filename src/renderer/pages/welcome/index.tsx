@@ -17,7 +17,6 @@ function Welcome() {
 
     useEffect(() => {
         window.electron.ipcRenderer.on('new-event-info', (events: Event[]) => {
-            console.log(events);
             const current = events.filter(
                 (e) =>
                     new Date(e.startTime) <= new Date() &&
