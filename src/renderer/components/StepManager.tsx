@@ -15,7 +15,7 @@ function StepManager() {
 
                 return null;
             })
-            .catch(() => { });
+            .catch(() => {});
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     return null;

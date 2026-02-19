@@ -15,11 +15,16 @@ export default function App() {
             mixer: false,
             switch: false,
             internet: false,
-            errors: []
-        }
+            errors: [],
+            ip_warnings: [],
+            ip_errors: [],
+        },
     });
 
-    const contextValue = useMemo(() => ({ status, setStatus }), [status, setStatus]);
+    const contextValue = useMemo(
+        () => ({ status, setStatus }),
+        [status, setStatus]
+    );
 
     return (
         <ConfigProvider
@@ -33,7 +38,10 @@ export default function App() {
             <StatusContext.Provider value={contextValue}>
                 <BackendStatusSync />
 
-                <div className="pretty-scroll" style={{ height: 'calc(100vh - 40px)', overflowY: 'auto' }}>
+                <div
+                    className="pretty-scroll"
+                    style={{ height: 'calc(100vh - 40px)', overflowY: 'auto' }}
+                >
                     <AppRoutes />
                 </div>
 

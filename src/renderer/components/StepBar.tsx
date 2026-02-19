@@ -4,6 +4,7 @@ import { Steppable } from 'models/steppable';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { storeStep } from 'renderer/web_utils/step_manager';
+import './StepBar.css';
 
 interface IProps extends Steppable {
     showNext?: boolean;
@@ -68,21 +69,12 @@ function StepBar({
     };
 
     return (
-        <Row
-            gutter={2}
-            style={{
-                position: 'fixed',
-                bottom: '43px',
-                left: 0,
-                width: '100%',
-                paddingLeft: '10px',
-            }}
-        >
+        <Row gutter={2} className="step-bar">
             <Col span={8}>
                 {showPrev && (
                     <Button
                         type="primary"
-                        danger
+                        ghost
                         loading={loading}
                         size="large"
                         onClick={handlePrevious}
@@ -93,7 +85,7 @@ function StepBar({
                     </Button>
                 )}
             </Col>
-            <Col span={8} offset={8} style={{ display: 'flex' }}>
+            <Col span={8} offset={8} className="step-bar-next-col">
                 {showNext && (
                     <Button
                         type="primary"
@@ -101,7 +93,7 @@ function StepBar({
                         size="large"
                         onClick={handleNext}
                         disabled={nextDisabled}
-                        style={{ marginLeft: 'auto', marginRight: '5px' }}
+                        className="step-bar-next-btn"
                     >
                         Next
                         <RightOutlined />

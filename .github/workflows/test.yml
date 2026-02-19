@@ -3,58 +3,58 @@ name: Test
 on: [push, pull_request]
 
 jobs:
-  pre_test:
-    runs-on: ubuntu-latest
-    outputs:
-      should_skip: ${{ steps.skip_check.outputs.should_skip }}
-    steps:
-      - id: skip_check
-        uses: fkirc/skip-duplicate-actions@v5
-        with:
-          concurrent_skipping: same_content_newer
-  
-  version_check:
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v3
-      - name: root package.json version bump?
-        uses: del-systems/check-if-version-bumped@v1.3
-        with:
-          path: package.json
-      - name: versions match (root and release)
-        run: diff <(jq .version ./package.json) <(jq .version ./release/app/package.json)
-        working-directory: '.'
+    pre_test:
+        runs-on: ubuntu-latest
+        outputs:
+            should_skip: ${{ steps.skip_check.outputs.should_skip }}
+        steps:
+            - id: skip_check
+              uses: fkirc/skip-duplicate-actions@v5
+              with:
+                  concurrent_skipping: same_content_newer
 
-  test:
-    needs: pre_test
-    if: needs.pre_test.outputs.should_skip != 'true'
-    runs-on: ${{ matrix.os }}
+    version_check:
+        if: ${{ github.event_name == 'pull_request' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Check out Git repository
+              uses: actions/checkout@v3
+            - name: root package.json version bump?
+              uses: del-systems/check-if-version-bumped@v1.3
+              with:
+                  path: package.json
+            - name: versions match (root and release)
+              run: diff <(jq .version ./package.json) <(jq .version ./release/app/package.json)
+              working-directory: '.'
 
-    strategy:
-      matrix:
-        os: [windows-latest, ubuntu-latest] # [macos-latest, windows-latest, ubuntu-latest]
+    test:
+        needs: pre_test
+        if: needs.pre_test.outputs.should_skip != 'true'
+        runs-on: ${{ matrix.os }}
 
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v3
+        strategy:
+            matrix:
+                os: [windows-latest, ubuntu-latest] # [macos-latest, windows-latest, ubuntu-latest]
 
-      - name: Install Node.js and NPM
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-          cache: npm
+        steps:
+            - name: Check out Git repository
+              uses: actions/checkout@v3
 
-      - name: npm install
-        run: |
-          npm install
+            - name: Install Node.js and NPM
+              uses: actions/setup-node@v3
+              with:
+                  node-version: 18
+                  cache: npm
 
-      - name: npm test
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          npm run package
-          npm run lint
-          npm exec tsc
-          # npm test
+            - name: npm install
+              run: |
+                  npm install
+
+            - name: npm test
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  npm run package
+                  npm run lint
+                  npm exec tsc
+                  # npm test

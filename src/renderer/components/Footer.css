@@ -1,0 +1,99 @@
+/* Custom Styles For App Footer */
+
+.app-footer {
+    width: 100%;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 4px 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 30px;
+    box-sizing: border-box;
+}
+
+.footer-divider {
+    width: 1px;
+    height: 14px;
+    background: rgba(255, 255, 255, 0.15);
+    flex-shrink: 0;
+}
+
+.footer-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.footer-icon {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+}
+
+.footer-icon--ready {
+    color: #52c41a;
+}
+
+.footer-icon--error {
+    color: #ff4d4f;
+}
+
+.footer-icon--warning {
+    color: #faad14;
+}
+
+.footer-icon--loading {
+    color: #1677ff;
+}
+
+.footer-icon--muted {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.footer-label {
+    font-size: 12px;
+}
+
+.footer-spacer {
+    flex: 1;
+}
+
+.footer-alerts {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.footer-alert-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 1;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-family: inherit;
+    white-space: nowrap;
+}
+
+.footer-alert-badge .ant-typography {
+    line-height: 1;
+}
+
+.footer-alert-badge--error {
+    background: rgba(255, 77, 79, 0.15);
+    color: #ff4d4f;
+    border: 1px solid rgba(255, 77, 79, 0.3);
+}
+
+.footer-alert-badge--warning {
+    background: rgba(250, 173, 20, 0.15);
+    color: #faad14;
+    border: 1px solid rgba(250, 173, 20, 0.3);
+}

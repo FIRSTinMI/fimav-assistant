@@ -1,4 +1,4 @@
-import { LogFunctions } from "electron-log";
+import { LogFunctions } from 'electron-log';
 
 export type AddonLoggers = {
     out: LogFunctions;

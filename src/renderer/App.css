@@ -3,56 +3,62 @@
  *        See https://github.com/webpack-contrib/sass-loader#imports
  */
 body {
-  position: relative;
-  min-height: 100vh;
-  margin: 0;
-  padding: 8px;
-  box-sizing: border-box;
-  background-color: #141414;
+    position: relative;
+    min-height: 100vh;
+    margin: 0;
+    padding: 8px;
+    box-sizing: border-box;
+    background-color: #141414;
 }
 
 .pretty-scroll::-webkit-scrollbar {
-  width: 8px; /* Adjust as needed */
+    width: 8px; /* Adjust as needed */
 }
 
 .pretty-scroll::-webkit-scrollbar-track {
-  background: #1f1f1f; /* Dark background */
+    background: #1f1f1f; /* Dark background */
 }
 
 .pretty-scroll::-webkit-scrollbar-thumb {
-  background: #3a3a3a; /* Darker thumb */
-  border-radius: 4px;
+    background: #3a3a3a; /* Darker thumb */
+    border-radius: 4px;
 }
 
 .pretty-scroll::-webkit-scrollbar-thumb:hover {
-  background: #4a4a3a; /* Hover state */
+    background: #4a4a3a; /* Hover state */
 }
 
 .pretty-scroll {
-  scrollbar-width: thin; /* Firefox */
-  scrollbar-color: #3a3a3a #1f1f1f; /* Firefox thumb/track */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #3a3a3a #1f1f1f; /* Firefox thumb/track */
 }
 
-
-
 @keyframes bounceV {
-  from { transform: translate3d(0, 0, 0);}
-  to { transform: translate3d(0, 15px, 0);}
+    from {
+        transform: translate3d(0, 0, 0);
+    }
+    to {
+        transform: translate3d(0, 15px, 0);
+    }
 }
 
 @keyframes bounceH {
-  from { transform: translate3d(0, 0, 0);}
-  to { transform: translate3d(5px, 0, 0);}
+    from {
+        transform: translate3d(0, 0, 0);
+    }
+    to {
+        transform: translate3d(5px, 0, 0);
+    }
 }
 
 .logo-bounce {
-  animation: bounceV 4s cubic-bezier(0.5, 0.1, .7, 0.5);
-  animation-direction: alternate;
-  animation-iteration-count: infinite;
+    animation: bounceV 4s cubic-bezier(0.5, 0.1, 0.7, 0.5);
+    animation-direction: alternate;
+    animation-iteration-count: infinite;
 }
 
 .btn-icon-bounce {
-  animation: bounceH .5s cubic-bezier(0.5, 0.1, .7, 0.5);
-  animation-direction: alternate;
-  animation-iteration-count: infinite;
+    animation: bounceH 0.5s cubic-bezier(0.5, 0.1, 0.7, 0.5);
+    animation-direction: alternate;
+    animation-iteration-count: infinite;
 }

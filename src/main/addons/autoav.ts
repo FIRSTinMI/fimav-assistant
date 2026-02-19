@@ -2,7 +2,11 @@ import EventEmitter from 'events';
 import { HubConnection, HubConnectionBuilder } from '@microsoft/signalr';
 import nodeFetch from 'node-fetch';
 import log from 'electron-log';
-import { EquipmentLogCategory, EquipmentLogDetails, EquipmentLogType } from '../../models/EquipmentLog';
+import {
+    EquipmentLogCategory,
+    EquipmentLogDetails,
+    EquipmentLogType,
+} from '../../models/EquipmentLog';
 import FMSMatchStatus from '../../models/FMSMatchState';
 import attemptRename from '../../utils/recording';
 import { AddonLoggers } from './addon-loggers';
@@ -56,7 +60,11 @@ export default class AutoAV {
     private async stopRecording() {
         // Check if we're recording
         if (!(await VmixService.Instance.isRecording())) {
-            this.logRecording('🟥 Not Recording', undefined, EquipmentLogType.Debug);
+            this.logRecording(
+                '🟥 Not Recording',
+                undefined,
+                EquipmentLogType.Debug
+            );
             return;
         }
 
@@ -74,7 +82,7 @@ export default class AutoAV {
                     this.logRecording(
                         'ℹ Event not Present. Fetching current event...',
                         undefined,
-                        EquipmentLogType.Warn,
+                        EquipmentLogType.Warn
                     );
                     this.currentEvent = await this.fetchEvent();
                 }
@@ -89,7 +97,11 @@ export default class AutoAV {
 
                     this.logRecording(`Renamed last recording to ${filename}`);
                 } catch (err: any) {
-                    this.logRecording(`‼️ Error Renaming Recording`, err, EquipmentLogType.Error);
+                    this.logRecording(
+                        `‼️ Error Renaming Recording`,
+                        err,
+                        EquipmentLogType.Error
+                    );
                 } finally {
                     this.lastMatchStartData = null;
                 }
@@ -97,7 +109,11 @@ export default class AutoAV {
                 return undefined;
             })
             .catch((err) => {
-                this.logRecording(`‼️ Error Stopping Recording`, err, EquipmentLogType.Error);
+                this.logRecording(
+                    `‼️ Error Stopping Recording`,
+                    err,
+                    EquipmentLogType.Error
+                );
             });
     }
 
@@ -108,7 +124,9 @@ export default class AutoAV {
     private startRecording(matchInfo: FMSMatchStatus) {
         VmixService.Instance.StartRecording()
             .then(() => {
-                this.logRecording(`🔴 Started Recording ${matchInfo.Level} Match #${matchInfo.MatchNumber}-${matchInfo.PlayNumber}`);
+                this.logRecording(
+                    `🔴 Started Recording ${matchInfo.Level} Match #${matchInfo.MatchNumber}-${matchInfo.PlayNumber}`
+                );
                 this.lastMatchStartData = matchInfo;
                 this.weAreRecording = true;
 
@@ -121,7 +139,11 @@ export default class AutoAV {
                 return undefined;
             })
             .catch((err) => {
-                this.logRecording(`‼️ Error Starting Recording. Is Vmix at ${VmixService.Instance.getUrl()}?`, err, EquipmentLogType.Error);
+                this.logRecording(
+                    `‼️ Error Starting Recording. Is Vmix at ${VmixService.Instance.getUrl()}?`,
+                    err,
+                    EquipmentLogType.Error
+                );
             });
     }
 
@@ -162,10 +184,13 @@ export default class AutoAV {
             (info: FMSMatchStatus) => {
                 // Log the change
                 this.logFMS(
-                    `Match Status Changed: ${this.lastState ? this.lastState.MatchState : 'Unknown'
-                    } -> ${info.MatchState} for ${info.Level} Match ${info.MatchNumber
+                    `Match Status Changed: ${
+                        this.lastState ? this.lastState.MatchState : 'Unknown'
+                    } -> ${info.MatchState} for ${info.Level} Match ${
+                        info.MatchNumber
                     } (Play #${info.PlayNumber})`,
-                    info, EquipmentLogType.Debug
+                    info,
+                    EquipmentLogType.Debug
                 );
 
                 // Update
@@ -196,19 +221,35 @@ export default class AutoAV {
 
         // Register listener for the "SystemConfigValueChanged" event (video switch))
         this.hubConnection.on('SystemConfigValueChanged', async (configKey) => {
-            this.logFMS(`Got a config value change`, { key: configKey }, EquipmentLogType.Debug);
+            this.logFMS(
+                `Got a config value change`,
+                { key: configKey },
+                EquipmentLogType.Debug
+            );
 
             // VideoSwitchOption
             if (configKey === 'VideoSwitchOption') {
-                this.logFMS('Video switch option changed, fetching update!', undefined, EquipmentLogType.Debug);
+                this.logFMS(
+                    'Video switch option changed, fetching update!',
+                    undefined,
+                    EquipmentLogType.Debug
+                );
                 const resp = await nodeFetch(
                     'http://10.0.100.5/api/v1.0/settings/get/get_VideoSwitchOption'
                 );
                 const switchOption = await resp.text();
-                this.logFMS(`Got Switch Option: ${switchOption}`, undefined, EquipmentLogType.Debug);
+                this.logFMS(
+                    `Got Switch Option: ${switchOption}`,
+                    undefined,
+                    EquipmentLogType.Debug
+                );
                 // "MatchResult" (yes, double quotes are included in the response)
                 if (switchOption === '"MatchResult"') {
-                    this.logFMS('🚀 Scores Posted. Waiting 16 Seconds...', undefined, EquipmentLogType.Debug);
+                    this.logFMS(
+                        '🚀 Scores Posted. Waiting 16 Seconds...',
+                        undefined,
+                        EquipmentLogType.Debug
+                    );
 
                     // TODO: Make this time dynamic and configurable
                     this.willStopRecording = true;
@@ -225,32 +266,52 @@ export default class AutoAV {
             'plc_connection_status_changed',
             'robotversiondatachanged',
             'azuresyncprogress',
-            'azuresyncstatuschanged'
+            'azuresyncstatuschanged',
         ];
 
         // Dummies to get log to shush
         bogusEvents.forEach((e) => {
-            this.hubConnection?.on(e, () => { });
+            this.hubConnection?.on(e, () => {});
         });
 
         // Register connected/disconnected events
         this.hubConnection.onreconnecting(() => {
-            this.logFMS('AutoAV FMS Connection Lost, Reconnecting', undefined, EquipmentLogType.Warn, true);
+            this.logFMS(
+                'AutoAV FMS Connection Lost, Reconnecting',
+                undefined,
+                EquipmentLogType.Warn,
+                true
+            );
         });
         this.hubConnection.onclose(() => {
-            this.logFMS('AutoAV FMS Connection Closed!', undefined, EquipmentLogType.Warn, true);
+            this.logFMS(
+                'AutoAV FMS Connection Closed!',
+                undefined,
+                EquipmentLogType.Warn,
+                true
+            );
         });
 
         // Start connection to SignalR Hub
         this.hubConnection
             .start()
             .then(() => {
-                this.logFMS('FMS Connection Established!', undefined, undefined, true);
+                this.logFMS(
+                    'FMS Connection Established!',
+                    undefined,
+                    undefined,
+                    true
+                );
 
                 return undefined;
             })
             .catch((err) => {
-                this.logFMS(`AutoAV FMS Connection Failed. Restarting...`, err, EquipmentLogType.Error, true);
+                this.logFMS(
+                    `AutoAV FMS Connection Failed. Restarting...`,
+                    err,
+                    EquipmentLogType.Error,
+                    true
+                );
 
                 setTimeout(() => {
                     // Restart AutoAV
@@ -305,41 +366,69 @@ export default class AutoAV {
 
     // Fetch the event name
     private async fetchEvent(): Promise<Event | null> {
-        return invokeExpectResponse<Event[]>('GetEvents', 'Events').then((events: Event[]) => {
-            return getCurrentEvent(events)
-        }).then((e) => {
-            return e ?? null;
-        }).catch((e) => {
-            this.log(
-                `‼️ Error Fetching Event Name`,
-                {
+        return invokeExpectResponse<Event[]>('GetEvents', 'Events')
+            .then((events: Event[]) => {
+                return getCurrentEvent(events);
+            })
+            .then((e) => {
+                return e ?? null;
+            })
+            .catch((e) => {
+                this.log(`‼️ Error Fetching Event Name`, {
                     severity: EquipmentLogType.Error,
                     extraInfo: e,
-                    category: EquipmentLogCategory.General
-                }
-            );
-            return null;
-        });
+                    category: EquipmentLogCategory.General,
+                });
+                return null;
+            });
     }
 
-    private logRecording(msg: string, extraInfo?: object, severity: EquipmentLogType = EquipmentLogType.Info, notifyClient = true) {
-        this.log(msg, { severity, extraInfo, category: EquipmentLogCategory.AutoAV_Recording }, notifyClient);
+    private logRecording(
+        msg: string,
+        extraInfo?: object,
+        severity: EquipmentLogType = EquipmentLogType.Info,
+        notifyClient = true
+    ) {
+        this.log(
+            msg,
+            {
+                severity,
+                extraInfo,
+                category: EquipmentLogCategory.AutoAV_Recording,
+            },
+            notifyClient
+        );
     }
 
-    private logFMS(msg: string, extraInfo?: object, severity: EquipmentLogType = EquipmentLogType.Info, notifyClient = false) {
-        this.log(msg, { severity, extraInfo, category: EquipmentLogCategory.AutoAV_FMS }, notifyClient);
+    private logFMS(
+        msg: string,
+        extraInfo?: object,
+        severity: EquipmentLogType = EquipmentLogType.Info,
+        notifyClient = false
+    ) {
+        this.log(
+            msg,
+            { severity, extraInfo, category: EquipmentLogCategory.AutoAV_FMS },
+            notifyClient
+        );
     }
 
     // Log a message
     private log(
         msg: string,
-        opts: EquipmentLogDetails = { severity: EquipmentLogType.Info, category: EquipmentLogCategory.AutoAV_General },
+        opts: EquipmentLogDetails = {
+            severity: EquipmentLogType.Info,
+            category: EquipmentLogCategory.AutoAV_General,
+        },
         notifyClient = false
     ) {
-
         if (this.logs) {
             // Local log to file
-            const localLog = opts.severity === EquipmentLogType.Error || opts.severity === EquipmentLogType.Fatal ? this.logs.err : this.logs.out;
+            const localLog =
+                opts.severity === EquipmentLogType.Error ||
+                opts.severity === EquipmentLogType.Fatal
+                    ? this.logs.err
+                    : this.logs.out;
             localLog.log(msg + (opts.extraInfo ? `\n\t${opts.extraInfo}` : ''));
         }
 
@@ -353,13 +442,11 @@ export default class AutoAV {
 
         // Log to backend
         try {
-            invokeLog(msg,
-                {
-                    severity: opts.severity,
-                    category: opts.category ?? EquipmentLogCategory.AutoAV_General,
-                    extraInfo: opts.extraInfo
-                }
-            );
+            invokeLog(msg, {
+                severity: opts.severity,
+                category: opts.category ?? EquipmentLogCategory.AutoAV_General,
+                extraInfo: opts.extraInfo,
+            });
         } catch (e) {
             this.logs?.err.error(`Failed to log message to backend: ${msg}`, e);
         }

@@ -10,11 +10,11 @@ export type AppConfig = {
     vmixApi: {
         baseUrl: string;
         username: string;
-        password: string
+        password: string;
     };
     autoAv: {
-        fileNameMode: 'in-season' | 'off-season'
-    }
+        fileNameMode: 'in-season' | 'off-season';
+    };
 };
 
 export function createStore(): Store<AppConfig> {
@@ -49,27 +49,27 @@ export function createStore(): Store<AppConfig> {
                 properties: {
                     baseUrl: {
                         type: 'string',
-                        default: 'http://127.0.0.1:8000/api'
+                        default: 'http://127.0.0.1:8000/api',
                     },
                     username: {
                         type: 'string',
-                        default: 'user'
+                        default: 'user',
                     },
                     password: {
                         type: 'string',
-                        default: 'pass'
-                    }
-                }
+                        default: 'pass',
+                    },
+                },
             },
             autoAv: {
                 type: 'object',
                 properties: {
                     fileNameMode: {
                         type: 'string',
-                        default: 'in-season'
-                    }
-                }
-            }
+                        default: 'in-season',
+                    },
+                },
+            },
         },
         migrations: {
             '0.0.4': (store) => {
@@ -90,12 +90,12 @@ export function createStore(): Store<AppConfig> {
                 store.set('vmixApi', {
                     baseUrl: 'http://127.0.0.1:8000/api',
                     username: 'user',
-                    password: 'pass'
+                    password: 'pass',
                 });
             },
             '0.0.29': (store) => {
                 store.set('autoAv.fileNameMode', 'in-season');
-            }
+            },
         },
     }) as Store<AppConfig>;
 }

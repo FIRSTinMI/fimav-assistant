@@ -4,10 +4,10 @@
 
 FiM AV Assistant is a tool with the following intentions:
 
-- Make setting up an event an easy step-by-step process
-- Flag issues early, and provide the volunteer with actionable next steps
-- Ensure consistency across all AV carts
-- Provide information to assist AV staff in troubleshooting issues
+-   Make setting up an event an easy step-by-step process
+-   Flag issues early, and provide the volunteer with actionable next steps
+-   Ensure consistency across all AV carts
+-   Provide information to assist AV staff in troubleshooting issues
 
 These goals are accomplished through an always running Electron app that integrates with live-captions, AutoAV, the FIM AV Backend Service, and FMS.
 
@@ -21,9 +21,9 @@ out of. This is intentional. This application may make automatic changes to your
 As with all FIRSTinMI projects, outside contributions are welcome via pull requests. When making a pull request, please note that the following criteria need to be
 met for a PR to be accepted (all of these criteria are enforced through automated testing pipelines):
 
-- `npm run lint` will need to come back with no errors or warnings
-- The version number in both `package.json` files needs to be bumped, and both need to match
-- The project must successfully build
+-   `npm run lint` will need to come back with no errors or warnings
+-   The version number in both `package.json` files needs to be bumped, and both need to match
+-   The project must successfully build
 
 ## Running Locally
 

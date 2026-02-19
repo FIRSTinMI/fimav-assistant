@@ -41,9 +41,12 @@ export default class LiveCaptions {
                 );
                 execSync(`taskkill /pid ${pid} /f /t`);
             }
-        } catch(err) {
+        } catch (err) {
             // Ignore any errors
-            this.logs.out.warn('Unable to stop existing live captions processes', err);
+            this.logs.out.warn(
+                'Unable to stop existing live captions processes',
+                err
+            );
         } finally {
             this.running = false;
             this.process = null;
@@ -143,7 +146,9 @@ export default class LiveCaptions {
             }
 
             // Start the live-captions process
-            this.process = spawn(exePath, ['--skip-update-check'], { shell: true });
+            this.process = spawn(exePath, ['--skip-update-check'], {
+                shell: true,
+            });
 
             // Log the stdout and stderr to files
             this.process.stdout.on('data', (data) => {

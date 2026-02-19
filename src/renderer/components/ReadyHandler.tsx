@@ -12,14 +12,14 @@ export enum ReadyState {
 
 function ReadyHandler({ ready }: { ready: ReadyState }) {
     switch (ready) {
-    case ReadyState.NotReady:
-        return <Spin />;
-    case ReadyState.Ready:
-        return <CheckCircleOutlined />;
-    case ReadyState.Error:
-        return <WarningOutlined />;
-    default:
-        return null;
+        case ReadyState.NotReady:
+            return <Spin />;
+        case ReadyState.Ready:
+            return <CheckCircleOutlined />;
+        case ReadyState.Error:
+            return <WarningOutlined />;
+        default:
+            return null;
     }
 }
 

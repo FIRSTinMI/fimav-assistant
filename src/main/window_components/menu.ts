@@ -5,7 +5,7 @@ import {
     BrowserWindow,
     MenuItemConstructorOptions,
     dialog,
-    clipboard
+    clipboard,
 } from 'electron';
 import Addons from 'main/addons';
 import { platform } from 'os';
@@ -56,14 +56,14 @@ export default class MenuBuilder {
                     },
                     ...(dev
                         ? ([
-                            {
-                                label: 'Quit',
-                                role: 'quit',
-                                click() {
-                                    quitApp();
-                                },
-                            },
-                        ] as MenuItemConstructorOptions[])
+                              {
+                                  label: 'Quit',
+                                  role: 'quit',
+                                  click() {
+                                      quitApp();
+                                  },
+                              },
+                          ] as MenuItemConstructorOptions[])
                         : []),
                 ],
             });
@@ -140,7 +140,7 @@ export default class MenuBuilder {
                         {
                             label: 'Set Stream Keys',
                             click: async () => {
-                                // Set a timeout for the stream keys, if we don't get a response in 10 seconds, show a message box 
+                                // Set a timeout for the stream keys, if we don't get a response in 10 seconds, show a message box
                                 const timeout = setTimeout(() => {
                                     dialog.showMessageBox({
                                         message:
@@ -150,18 +150,22 @@ export default class MenuBuilder {
                                     });
                                 }, 10000);
 
-                                VmixService.Instance.events.once('streamInfoUpdated', (success: boolean) => {
-                                    // Clear the timeout  
-                                    clearTimeout(timeout);
-                                    
-                                    // Show a message
-                                    dialog.showMessageBox({
-                                        message:
-                                            success ? 'Successfully set vMix streaming locations' : 'Failed to set streaming locations. Check the log for more details.',
-                                        title: 'vMix Streaming',
-                                        type: 'info',
-                                    });
-                                });
+                                VmixService.Instance.events.once(
+                                    'streamInfoUpdated',
+                                    (success: boolean) => {
+                                        // Clear the timeout
+                                        clearTimeout(timeout);
+
+                                        // Show a message
+                                        dialog.showMessageBox({
+                                            message: success
+                                                ? 'Successfully set vMix streaming locations'
+                                                : 'Failed to set streaming locations. Check the log for more details.',
+                                            title: 'vMix Streaming',
+                                            type: 'info',
+                                        });
+                                    }
+                                );
 
                                 // This will trigger SignalR to send us the stream info, which is being listened for in register-events.ts
                                 invoke('GetStreamInfo');
@@ -181,19 +185,19 @@ export default class MenuBuilder {
                         },
                         ...(dev
                             ? ([
-                                {
-                                    label: 'Start Recording (Dev)',
-                                    click() {
-                                        AutoAV.Instance.devStartRecording();
-                                    },
-                                },
-                                {
-                                    label: 'Stop Recording (Dev)',
-                                    click() {
-                                        AutoAV.Instance.devStopRecording();
-                                    },
-                                },
-                            ] as MenuItemConstructorOptions[])
+                                  {
+                                      label: 'Start Recording (Dev)',
+                                      click() {
+                                          AutoAV.Instance.devStartRecording();
+                                      },
+                                  },
+                                  {
+                                      label: 'Stop Recording (Dev)',
+                                      click() {
+                                          AutoAV.Instance.devStopRecording();
+                                      },
+                                  },
+                              ] as MenuItemConstructorOptions[])
                             : []),
                     ],
                 },
@@ -336,12 +340,13 @@ export default class MenuBuilder {
 
                     const result = await dialog.showMessageBox({
                         title: 'Additional Action Required',
-                        message: 'Input created. Click "copy" to copy necessary CSS, then right click the input, go to properties, and paste.',
+                        message:
+                            'Input created. Click "copy" to copy necessary CSS, then right click the input, go to properties, and paste.',
                         type: 'info',
                         buttons: ['Copy', 'Skip'],
-                        defaultId: 0
+                        defaultId: 0,
                     });
-                    
+
                     if (result.response === 0) {
                         clipboard.writeText('body {background: transparent;}');
                     }

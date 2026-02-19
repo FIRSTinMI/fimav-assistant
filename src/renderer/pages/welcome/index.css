@@ -1,0 +1,24 @@
+/* Custom Styles For Welcome Page */
+
+.welcome-page {
+    text-align: center;
+    width: 100%;
+    height: 100%;
+}
+
+.welcome-logo {
+    max-width: 30%;
+    max-height: 80%;
+    height: 100%;
+    margin-top: 5%;
+    filter: drop-shadow(0px 0px 1px #ffffff);
+    -webkit-filter: drop-shadow(0px 0px 1px #ffffff);
+}
+
+.welcome-title {
+    margin-top: 0 !important;
+}
+
+.welcome-subtitle {
+    margin-top: 0 !important;
+}

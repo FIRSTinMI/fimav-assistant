@@ -60,9 +60,10 @@ export default class VmixService {
     }
 
     async StartStream(streamNumber?: number): Promise<void> {
-        ;
         const rsp = await fetch(
-            `${this.settings.baseUrl}?Function=StartStreaming&Value=${streamNumber ?? ''}`,
+            `${this.settings.baseUrl}?Function=StartStreaming&Value=${
+                streamNumber ?? ''
+            }`,
             {
                 headers: this.createHeaders(),
             }
@@ -74,9 +75,10 @@ export default class VmixService {
     }
 
     async StopStream(streamNumber?: number): Promise<void> {
-        ;
         const rsp = await fetch(
-            `${this.settings.baseUrl}?Function=StopStreaming&Value=${streamNumber ?? ''}`,
+            `${this.settings.baseUrl}?Function=StopStreaming&Value=${
+                streamNumber ?? ''
+            }`,
             {
                 headers: this.createHeaders(),
             }
@@ -89,26 +91,31 @@ export default class VmixService {
 
     async SetStreamInfo(sInfo: StreamInfo[]): Promise<void> {
         const totalSupportedStreams = 3;
-        const streamInfo = sInfo.filter(info => info.rtmpKey && info.rtmpUrl);
+        const streamInfo = sInfo.filter((info) => info.rtmpKey && info.rtmpUrl);
 
         // whatever index 0-totalSupportedStreams is missing we'll add it
         if (streamInfo.length < totalSupportedStreams) {
             for (let i = 0; i < totalSupportedStreams; i += 1) {
-                if (!streamInfo.find(info => info.index === i)) {
+                if (!streamInfo.find((info) => info.index === i)) {
                     streamInfo.push({
                         index: i,
                         rtmpUrl: '',
-                        rtmpKey: ''
+                        rtmpKey: '',
                     });
                 }
             }
         }
 
         log.info(streamInfo);
-        invokeLog(`Setting ${streamInfo.length} streams in vMix`, { 
-            category: EquipmentLogCategory.Vmix_General, 
-            extraInfo: { payloads: streamInfo.map(k => ({ i: k.index, url: k.rtmpUrl })) }, 
-            severity: EquipmentLogType.Info 
+        invokeLog(`Setting ${streamInfo.length} streams in vMix`, {
+            category: EquipmentLogCategory.Vmix_General,
+            extraInfo: {
+                payloads: streamInfo.map((k) => ({
+                    i: k.index,
+                    url: k.rtmpUrl,
+                })),
+            },
+            severity: EquipmentLogType.Info,
         });
 
         const setStreamInfo = async (info: StreamInfo): Promise<void> => {
@@ -134,13 +141,15 @@ export default class VmixService {
             return setStreamInfo(info);
         }, Promise.resolve());
 
-        chain.then(() => {
-            this.emitter.emit('streamInfoUpdated', true);
-            return null;
-        }).catch((err) => {
-            this.emitter.emit('streamInfoUpdated', false);
-            log.error('Failed to set stream info', err);
-        });
+        chain
+            .then(() => {
+                this.emitter.emit('streamInfoUpdated', true);
+                return null;
+            })
+            .catch((err) => {
+                this.emitter.emit('streamInfoUpdated', false);
+                log.error('Failed to set stream info', err);
+            });
 
         return chain;
     }
@@ -172,18 +181,15 @@ export default class VmixService {
             }
         );
         // Ensure unmuted
-        await fetch(
-            `${this.settings.baseUrl}?Function=AudioOn&Input=${guid}`,
-            {
-                headers: this.createHeaders(),
-            }
-        );
+        await fetch(`${this.settings.baseUrl}?Function=AudioOn&Input=${guid}`, {
+            headers: this.createHeaders(),
+        });
     }
 
     async GetBase(): Promise<any> {
         return fetch(`${this.settings.baseUrl}`, {
             headers: this.createHeaders(),
-            signal: AbortSignal.timeout(5_000)
+            signal: AbortSignal.timeout(5_000),
         })
             .then((response) => response.text())
             .then((xml) => {
