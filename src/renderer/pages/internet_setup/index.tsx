@@ -50,7 +50,7 @@ function InternetSetup({ nextStep, previousStep }: Steppable) {
 
                 <Card className="internet-setup-card">
                     <Text>
-                        Connect the venue ethernet into port <b>7</b> on the
+                        Connect the network box into port <b>7</b> on the
                         Switch on the rear of the AV Cart (4th column, top row,
                         highlighted below).
                     </Text>

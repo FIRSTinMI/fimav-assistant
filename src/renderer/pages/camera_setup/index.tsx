@@ -15,7 +15,7 @@ const { Title, Text } = Typography;
 
 const subSteps = [
     {
-        text: 'Time to setup the camera(s)!  Locate the orange camera pelican and take out a camera.',
+        text: 'Time to setup the cameras!  Locate the orange camera pelican and take out a camera.',
         img: CameraPelicans,
     },
     {
