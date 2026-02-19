@@ -1,0 +1,36 @@
+/* Custom Styles For Fallback to Docs Page */
+
+.docs-page {
+    text-align: center;
+    width: 100%;
+}
+
+.docs-subtitle {
+    font-size: 15px;
+}
+
+.docs-card {
+    max-width: 480px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.docs-status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.docs-status-icon {
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+}
+
+.docs-section-label {
+    font-size: 13px;
+}

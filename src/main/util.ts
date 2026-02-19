@@ -43,27 +43,27 @@ export const signalrToElectronLog = (
 ): void => {
     if (log === null) return;
     switch (logLevel) {
-    case LogLevel.Debug:
-    case LogLevel.Trace:
-        if (isDebug()) log.info(message);
-        break;
-    case LogLevel.Information:
-        log.info(message);
-        break;
-    case LogLevel.Warning:
-        log.warn(message);
-        break;
-    case LogLevel.Error:
-        log.error(message);
-        break;
-    case LogLevel.Critical:
-        log.error(message);
-        break;
-    case LogLevel.None:
-        log.info(message);
-        break;
-    default:
-        break;
+        case LogLevel.Debug:
+        case LogLevel.Trace:
+            if (isDebug()) log.info(message);
+            break;
+        case LogLevel.Information:
+            log.info(message);
+            break;
+        case LogLevel.Warning:
+            log.warn(message);
+            break;
+        case LogLevel.Error:
+            log.error(message);
+            break;
+        case LogLevel.Critical:
+            log.error(message);
+            break;
+        case LogLevel.None:
+            log.info(message);
+            break;
+        default:
+            break;
     }
 };
 

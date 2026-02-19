@@ -12,7 +12,7 @@ module.exports = {
         indent: ['warn', 4],
         'no-use-before-define': 'off',
         'global-require': 'off',
-        'no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }]
+        'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
     },
     parserOptions: {
         ecmaVersion: 2020,

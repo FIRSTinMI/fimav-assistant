@@ -2,22 +2,25 @@ import { spawn } from 'child_process';
 import electronLog, { LogFunctions } from 'electron-log';
 import { NetAdapterModel } from 'models/AdvancedAdapterInfo';
 import HWCheckResponse from 'models/HWCheckResponse';
-import SoundVolumeViewOutput, { ParsedSoundOutput } from 'models/SoundVolumeViewOutput';
+import SoundVolumeViewOutput, {
+    ParsedSoundOutput,
+} from 'models/SoundVolumeViewOutput';
 import { networkInterfaces, hostname, NetworkInterfaceInfo } from 'os';
 import path from 'path';
 import ping from 'ping';
 import { elevatedPSCommand, psCommand } from '../util';
+import HWPing from '../addons/hw-ping';
 
 const SoundVolumeViewPath =
     process.env.NODE_ENV === 'production'
         ? path.join(
-            process.resourcesPath,
-            'assets/SoundVolumeView/SoundVolumeView.exe'
-        )
+              process.resourcesPath,
+              'assets/SoundVolumeView/SoundVolumeView.exe'
+          )
         : path.join(
-            __dirname,
-            '../../../assets/SoundVolumeView/SoundVolumeView.exe'
-        );
+              __dirname,
+              '../../../assets/SoundVolumeView/SoundVolumeView.exe'
+          );
 
 const pingConfig = {
     timeout: 3,
@@ -49,6 +52,10 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
             static: false,
             ip: '',
             interface: '',
+        },
+        ip_config: {
+            errors: [],
+            warnings: [],
         },
     };
 
@@ -91,25 +98,38 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     resp.nics_found = Object.keys(interfaces);
 
     // Find important interfaces
-    Object.keys(interfaces).forEach(key => {
-        const compare = key.toLowerCase()
-        if (compare === "ethernet") {
+    Object.keys(interfaces).forEach((key) => {
+        const compare = key.toLowerCase();
+        if (compare === 'ethernet') {
             primaryNic = interfaces[key];
             primaryName = key;
-        } else if (compare === "ethernet 2") {
+        } else if (compare === 'ethernet 2') {
             secondaryNic = interfaces[key];
             secondaryName = key;
         }
 
         // See if we have advanced info on this NIC and the driver desc is Hyper-V
-        if (advancedInterfaces[key] && advancedInterfaces[key].DriverDesc === "{Hyper-V Virtual Ethernet Adapter}") {
-            if (advancedInterfaces[key].VLAN_ID === '10' || key.toLowerCase().includes("internet")) {
+        if (
+            advancedInterfaces[key] &&
+            advancedInterfaces[key].DriverDesc ===
+                '{Hyper-V Virtual Ethernet Adapter}'
+        ) {
+            if (
+                advancedInterfaces[key].VLAN_ID === '10' ||
+                key.toLowerCase().includes('internet')
+            ) {
                 vlan10 = interfaces[key];
                 vlan10Name = key;
-            } else if (advancedInterfaces[key].VLAN_ID === '20' || key.toLowerCase().includes("field")) {
+            } else if (
+                advancedInterfaces[key].VLAN_ID === '20' ||
+                key.toLowerCase().includes('field')
+            ) {
                 vlan20 = interfaces[key];
                 vlan20Name = key;
-            } else if (advancedInterfaces[key].VLAN_ID === '30' || key.toLowerCase().includes("av")) {
+            } else if (
+                advancedInterfaces[key].VLAN_ID === '30' ||
+                key.toLowerCase().includes('av')
+            ) {
                 vlan30 = interfaces[key];
                 vlan30Name = key;
             }
@@ -117,7 +137,7 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     });
 
     // Valid collections of NICs
-    const allExist = vlan10 && vlan20 && vlan30;;
+    const allExist = vlan10 && vlan20 && vlan30;
     const altConfig = vlan10 && secondaryName && vlan30;
 
     // Check that we found all the required NICs
@@ -132,9 +152,11 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
         if (staticInfo[vlan10Name] === false) {
             resp.static_venue_ip = {
                 static: true,
-                ip: vlan10.find((i) => i.family === 'IPv4')?.address || 'Unknown',
+                ip:
+                    vlan10.find((i) => i.family === 'IPv4')?.address ||
+                    'Unknown',
                 interface: vlan10Name,
-            }
+            };
         }
     }
 
@@ -316,18 +338,20 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     }
 
     // Set sound scheme to none
-    await psCommand('New-ItemProperty -Path HKCU:\\AppEvents\\Schemes -Name "(Default)" -Value ".None" -Force | Out-Null');
+    await psCommand(
+        'New-ItemProperty -Path HKCU:\\AppEvents\\Schemes -Name "(Default)" -Value ".None" -Force | Out-Null'
+    );
 
     const keysToExclude = ['id', 'registry_key'];
 
     resp.audio_devices_found.map((device: any) =>
-        keysToExclude.forEach(key => delete device[key])
-    )
+        keysToExclude.forEach((key) => delete device[key])
+    );
 
     resp.cart_number = cartNumber;
+    resp.ip_config = HWPing.Instance.checkNetworkConfig();
 
     log.info(resp);
-
     return resp;
 }
 
@@ -339,7 +363,9 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
 export function enableDhcp(interfaceName: string): Promise<boolean> {
     const dhcpIpCmd = `netsh interface ipv4 set address name="${interfaceName}" dhcp`;
     const dhcpDnsCmd = `netsh interface ipv4 set dnsservers name="${interfaceName}" dhcp`;
-    return elevatedPSCommand(`${dhcpIpCmd}; ${dhcpDnsCmd};`).then(() => true).catch(() => false);
+    return elevatedPSCommand(`${dhcpIpCmd}; ${dhcpDnsCmd};`)
+        .then(() => true)
+        .catch(() => false);
 }
 
 /**
@@ -347,9 +373,16 @@ export function enableDhcp(interfaceName: string): Promise<boolean> {
  * @param interfaceName Interface name to enable DHCP for
  * @returns true if successful, false if not
  */
-export function setStaticIp(interfaceName: string, ip: string, subnet: string, gateway: string): Promise<boolean> {
+export function setStaticIp(
+    interfaceName: string,
+    ip: string,
+    subnet: string,
+    gateway: string
+): Promise<boolean> {
     const dhcpIpCmd = `netsh interface ipv4 set address name="${interfaceName}" static ${ip} ${subnet} ${gateway}`;
-    return elevatedPSCommand(`${dhcpIpCmd}`).then(() => true).catch(() => false);
+    return elevatedPSCommand(`${dhcpIpCmd}`)
+        .then(() => true)
+        .catch(() => false);
 }
 
 /**
@@ -357,97 +390,123 @@ export function setStaticIp(interfaceName: string, ip: string, subnet: string, g
  * @param interfaceName Interface name to enable DHCP for
  * @returns true if successful, false if not
  */
-export function setStaticDns(interfaceName: string, primary: string): Promise<boolean> {
+export function setStaticDns(
+    interfaceName: string,
+    primary: string
+): Promise<boolean> {
     const dhcpIpCmd = `netsh interface ipv4 set dnsservers name="${interfaceName}" static ${primary} primary`;
-    return elevatedPSCommand(`${dhcpIpCmd}`).then(() => true).catch(() => false);
+    return elevatedPSCommand(`${dhcpIpCmd}`)
+        .then(() => true)
+        .catch(() => false);
 }
 
 // Get advanced network interface info
 // See the output in assets/sample_payloads/ExampleNetworkOutput.json for some example data
-function advancedNetworkInterfaces(log: LogFunctions): Promise<NetAdapterModel> {
-    return psCommand('Get-NetAdapterAdvancedProperty -Name "*" -AllProperties | Format-List -Property "*"').then((stdout) => {
-        // Parse the output into a JavaScript object
-        const objs: any[] = [];
-        let index = 0;
+function advancedNetworkInterfaces(
+    log: LogFunctions
+): Promise<NetAdapterModel> {
+    return psCommand(
+        'Get-NetAdapterAdvancedProperty -Name "*" -AllProperties | Format-List -Property "*"'
+    )
+        .then((stdout) => {
+            // Parse the output into a JavaScript object
+            const objs: any[] = [];
+            let index = 0;
 
-        // Split on new line and loop
-        stdout.split('\n').forEach(line => {
-            // Create object if doesn't exist
-            if (!objs[index]) objs[index] = {};
+            // Split on new line and loop
+            stdout.split('\n').forEach((line) => {
+                // Create object if doesn't exist
+                if (!objs[index]) objs[index] = {};
 
-            // Split on colon, trim whitespace
-            const [name, value] = line.split(':').map(part => part.trim());
+                // Split on colon, trim whitespace
+                const [name, value] = line
+                    .split(':')
+                    .map((part) => part.trim());
 
-            // Empty line is new adapter
-            if (name === '') {
-                index += 1;
-            } else {
-                objs[index][name] = value;
-            }
+                // Empty line is new adapter
+                if (name === '') {
+                    index += 1;
+                } else {
+                    objs[index][name] = value;
+                }
+            });
+
+            // Convert to object key'd by "Name"
+            const byNames: any = {};
+            objs.forEach((obj) => {
+                if (!byNames[obj.Name]) byNames[obj.Name] = {};
+                byNames[obj.Name][obj.ValueName] = obj.ValueData;
+            });
+
+            return byNames;
+        })
+        .catch((err) => {
+            log.error('Could not get advanced network interface info: ', err);
+            return {};
         });
-
-        // Convert to object key'd by "Name"
-        const byNames: any = {};
-        objs.forEach(obj => {
-            if (!byNames[obj.Name]) byNames[obj.Name] = {};
-            byNames[obj.Name][obj.ValueName] = obj.ValueData;
-        });
-
-        return byNames;
-    }).catch((err) => {
-        log.error('Could not get advanced network interface info: ', err);
-        return {};
-    });
 }
-
 
 /**
  * Check if the interface is static or DHCP
  * @returns Interface => static IP
  */
-function getIntefaceStaticInfo(log: LogFunctions): Promise<{ [key: string]: boolean }> {
-    return psCommand('$IpConfig = Get-NetIPConfiguration; Get-NetIPInterface -ifindex $IpConfig.InterfaceIndex | select ifIndex,ifAlias,Dhcp, AddressFamily').then((stdout) => {
-        // Split the output into lines and remove any leading/trailing whitespace
-        const lines = stdout.trim().split('\n').slice(3); // Exclude header
+function getIntefaceStaticInfo(
+    log: LogFunctions
+): Promise<{ [key: string]: boolean }> {
+    return psCommand(
+        '$IpConfig = Get-NetIPConfiguration; Get-NetIPInterface -ifindex $IpConfig.InterfaceIndex | select ifIndex,ifAlias,Dhcp, AddressFamily'
+    )
+        .then((stdout) => {
+            // Split the output into lines and remove any leading/trailing whitespace
+            const lines = stdout.trim().split('\n').slice(3); // Exclude header
 
-        // Parse each line and construct JSON object
-        const parsedData = lines.map((line: string) => {
-            // Parse the line
-            const match = line.trim().match(/^(\d+)\s(.+?)\s+(Enabled|Disabled)\s+(\w+)$/);
-            // If no match, return null
-            if (!match) return null;
-            // Destructure the match
-            const [, ifIndex, ifAlias, Dhcp, AddressFamily] = match;
-            // Return the object
-            return {
-                ifIndex: parseInt(ifIndex.trim(), 10),
-                ifAlias: ifAlias.trim(),
-                dhcp: Dhcp.trim() === 'Enabled',
-                AddressFamily: AddressFamily?.trim()
-            };
-        }).filter((data: any) => data !== null);
+            // Parse each line and construct JSON object
+            const parsedData = lines
+                .map((line: string) => {
+                    // Parse the line
+                    const match = line
+                        .trim()
+                        .match(/^(\d+)\s(.+?)\s+(Enabled|Disabled)\s+(\w+)$/);
+                    // If no match, return null
+                    if (!match) return null;
+                    // Destructure the match
+                    const [, ifIndex, ifAlias, Dhcp, AddressFamily] = match;
+                    // Return the object
+                    return {
+                        ifIndex: parseInt(ifIndex.trim(), 10),
+                        ifAlias: ifAlias.trim(),
+                        dhcp: Dhcp.trim() === 'Enabled',
+                        AddressFamily: AddressFamily?.trim(),
+                    };
+                })
+                .filter((data: any) => data !== null);
 
-        // Filter out IPv6 addresses
-        const ipv4Data = parsedData.filter((data: any) => data.AddressFamily === 'IPv4');
+            // Filter out IPv6 addresses
+            const ipv4Data = parsedData.filter(
+                (data: any) => data.AddressFamily === 'IPv4'
+            );
 
-        // Map to object keyed by ifAlias
-        const byAlias: { [key: string]: boolean } = {};
-        ipv4Data.forEach((data: any) => {
-            byAlias[data.ifAlias] = data.dhcp;
+            // Map to object keyed by ifAlias
+            const byAlias: { [key: string]: boolean } = {};
+            ipv4Data.forEach((data: any) => {
+                byAlias[data.ifAlias] = data.dhcp;
+            });
+
+            return byAlias;
+        })
+        .catch((err) => {
+            log.error('Could not get interface static info: ', err);
+            return {};
         });
-
-        return byAlias;
-    }).catch((err) => {
-        log.error('Could not get interface static info: ', err);
-        return {};
-    });
 }
 
 /*
-* Fetch and parse audio devices
-*   log: Electron log instance
-*/
-export async function fetchAndParseAudioDevices(log: LogFunctions): Promise<ParsedSoundOutput[]> {
+ * Fetch and parse audio devices
+ *   log: Electron log instance
+ */
+export async function fetchAndParseAudioDevices(
+    log: LogFunctions
+): Promise<ParsedSoundOutput[]> {
     // Fetch Devices
     const devices = await getAudioDevices(log);
 
@@ -470,10 +529,12 @@ export async function fetchAndParseAudioDevices(log: LogFunctions): Promise<Pars
 }
 
 /*
-* Get audio devices
-*   log: Electron log instance
-*/
-async function getAudioDevices(log: LogFunctions): Promise<SoundVolumeViewOutput[]> {
+ * Get audio devices
+ *   log: Electron log instance
+ */
+async function getAudioDevices(
+    log: LogFunctions
+): Promise<SoundVolumeViewOutput[]> {
     return new Promise((resolve) => {
         // Run .\SoundVolumeView.exe /Sjson
         const proc = spawn(SoundVolumeViewPath, ['/Sjson']);
@@ -521,10 +582,10 @@ async function getAudioDevices(log: LogFunctions): Promise<SoundVolumeViewOutput
 }
 
 /*
-* Set the volume of a device
-*   deviceCmdName: The command line friendly ID of the device
-*   percent: The percent to set the volume to (0-100)
-*/
+ * Set the volume of a device
+ *   deviceCmdName: The command line friendly ID of the device
+ *   percent: The percent to set the volume to (0-100)
+ */
 export async function setVolumePercent(
     deviceCmdName: string,
     percent: number
@@ -533,26 +594,26 @@ export async function setVolumePercent(
 }
 
 /*
-* Unmute a device
-*   deviceCmdName: The command line friendly ID of the device
-*/
+ * Unmute a device
+ *   deviceCmdName: The command line friendly ID of the device
+ */
 export async function unmuteDevice(deviceCmdName: string): Promise<boolean> {
     return runSetSoundCommand('/Unmute', deviceCmdName);
 }
 
 /*
-* Mute a device
-*   deviceCmdName: The command line friendly ID of the device
-*/
+ * Mute a device
+ *   deviceCmdName: The command line friendly ID of the device
+ */
 export async function muteDevice(deviceCmdName: string): Promise<boolean> {
     return runSetSoundCommand('/Unmute', deviceCmdName);
 }
 
 /*
-* Set the default audio device
-*   deviceCmdName: The command line friendly ID of the device
-*   type: The type of device to set as default
-*/
+ * Set the default audio device
+ *   deviceCmdName: The command line friendly ID of the device
+ *   type: The type of device to set as default
+ */
 export async function setDefaultAudioDevice(
     deviceCmdName: string,
     type: 'Console' | 'Multimedia' | 'Communications' | 'all'
@@ -561,10 +622,10 @@ export async function setDefaultAudioDevice(
 }
 
 /*
-* Run a SoundVolumeView command
-*   cmd: The command to run
-*   params: The parameters to pass to the command
-*/
+ * Run a SoundVolumeView command
+ *   cmd: The command to run
+ *   params: The parameters to pass to the command
+ */
 async function runSetSoundCommand(
     cmd: string,
     ...params: string[]
@@ -577,12 +638,12 @@ async function runSetSoundCommand(
         // Spawn the process
         const proc = spawn(SoundVolumeViewPath, [cmd, ...params]);
         // Listen for exit
-        proc.on("exit", () => {
+        proc.on('exit', () => {
             resolve(true);
         });
 
         // Listen for error
-        proc.on("error", (err) => {
+        proc.on('error', (err) => {
             reject(err);
         });
     });

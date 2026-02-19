@@ -1,4 +1,5 @@
-import { Button, Space, Typography, Flex } from 'antd';
+import { Alert, Button, Card, Flex, Space, Typography } from 'antd';
+import { WarningOutlined } from '@ant-design/icons';
 import HWPingResponse from 'models/HWPingResponse';
 import { Steppable } from 'models/steppable';
 import { useEffect, useState } from 'react';
@@ -8,6 +9,9 @@ import CameraPelicans from '../../../../assets/photos/camera_pelican.jpg';
 import FRCField from '../../../../assets/photos/frc_field_2024.png';
 import AVVlanHighlighted from '../../../../assets/photos/avvlan-highlighted.png';
 import PTZOpticsPower from '../../../../assets/photos/ptzoptics_power.jpg';
+import './index.css';
+
+const { Title, Text } = Typography;
 
 const subSteps = [
     {
@@ -36,7 +40,23 @@ const subSteps = [
     },
 ];
 
-function InternetSetup({ nextStep, previousStep }: Steppable) {
+interface CameraStatusRowProps {
+    label: string;
+    state: ReadyState;
+}
+
+function CameraStatusRow({ label, state }: CameraStatusRowProps) {
+    return (
+        <div className="camera-status-row">
+            <span className="camera-status-icon">
+                <ReadyHandler ready={state} />
+            </span>
+            <Text>{label}</Text>
+        </div>
+    );
+}
+
+function CameraSetup({ nextStep, previousStep }: Steppable) {
     const [errors, setErrors] = useState<string[]>([]);
     const [cam1, setCam1] = useState<boolean>(false);
     const [cam2, setCam2] = useState<boolean>(false);
@@ -53,85 +73,116 @@ function InternetSetup({ nextStep, previousStep }: Steppable) {
     }, []); // only run once
 
     const previous = () => {
-        if (subStep > 0) {
-            setSubStep(subStep - 1);
-        }
+        if (subStep > 0) setSubStep(subStep - 1);
     };
 
     const next = () => {
-        if (subStep < subSteps.length - 1) {
-            setSubStep(subStep + 1);
-        }
+        if (subStep < subSteps.length - 1) setSubStep(subStep + 1);
     };
+
+    const hasIssues = errors.length > 0;
 
     return (
         <>
             <Space
                 direction="vertical"
-                style={{ textAlign: 'center', width: '100%' }}
+                className="camera-setup-page"
+                size="large"
             >
-                <Typography.Title level={1}>Camera Setup</Typography.Title>
+                <div>
+                    <Title level={1}>Camera Setup</Title>
+                    <Text type="secondary" style={{ fontSize: 15 }}>
+                        Follow the steps below to place and connect your
+                        cameras.
+                    </Text>
+                </div>
 
-                <Flex gap="small" align="center" vertical>
-                    <Flex gap="small" wrap="wrap">
+                {/* Sub-step card */}
+                <Card className="camera-setup-card">
+                    <div className="camera-setup-substep-nav">
                         <Button onClick={previous} disabled={subStep === 0}>
                             Previous
                         </Button>
-                        {subStep < subSteps.length - 1 && (
-                            <Button
-                                onClick={next}
-                                disabled={subStep === subSteps.length - 1}
-                            >
-                                Next
-                            </Button>
-                        )}
-                    </Flex>
-                </Flex>
+                        <Text
+                            type="secondary"
+                            className="camera-setup-substep-counter"
+                        >
+                            Step {subStep + 1} of {subSteps.length}
+                        </Text>
+                        <Button
+                            onClick={next}
+                            disabled={subStep === subSteps.length - 1}
+                        >
+                            Next
+                        </Button>
+                    </div>
+                    <Text>{subSteps[subStep].text}</Text>
+                    {subSteps[subStep].img !== null && (
+                        <Flex justify="center">
+                            <img
+                                src={subSteps[subStep].img ?? ''}
+                                alt="Camera Setup"
+                                className="camera-setup-photo"
+                            />
+                        </Flex>
+                    )}
+                </Card>
 
-                <Typography.Text>{subSteps[subStep].text}</Typography.Text>
-
-                {subSteps[subStep].img !== null && (
-                    <Flex gap="small" align="center" vertical>
-                        <img
-                            src={subSteps[subStep].img ?? ''}
-                            alt="Camera Setup"
-                            style={{ width: '30%' }}
+                {/* Camera status */}
+                <Card className="camera-status-card">
+                    <Space
+                        direction="vertical"
+                        style={{ width: '100%' }}
+                        size={8}
+                    >
+                        <CameraStatusRow
+                            label="Camera 1"
+                            state={
+                                cam1 ? ReadyState.Ready : ReadyState.NotReady
+                            }
                         />
-                    </Flex>
-                )}
+                        <CameraStatusRow
+                            label="Camera 2"
+                            state={
+                                cam2 ? ReadyState.Ready : ReadyState.NotReady
+                            }
+                        />
+                        {process.env.NODE_ENV === 'development' && (
+                            <CameraStatusRow
+                                label="Developer"
+                                state={ReadyState.Ready}
+                            />
+                        )}
+                    </Space>
+                </Card>
 
-                <Typography.Text>
-                    <ReadyHandler
-                        ready={cam1 ? ReadyState.Ready : ReadyState.NotReady}
-                    />{' '}
-                    Camera 1
-                </Typography.Text>
-
-                <Typography.Text>
-                    <ReadyHandler
-                        ready={cam2 ? ReadyState.Ready : ReadyState.NotReady}
-                    />{' '}
-                    Camera 2
-                </Typography.Text>
-
-                {process.env.NODE_ENV === 'development' && (
-                    <Typography.Text>
-                        <ReadyHandler ready={ReadyState.Ready} /> Developer
-                    </Typography.Text>
-                )}
-
-                {errors && errors.length > 0 && (
-                    <>
-                        <Typography.Text>
-                            Don&apos;t worry about any errors below. We&apos;ll
-                            help you get these resolved soon!
-                        </Typography.Text>
-                        {errors.map((error) => (
-                            <Typography.Text type="danger">
-                                {error}
-                            </Typography.Text>
-                        ))}
-                    </>
+                {/* Issues */}
+                {hasIssues && (
+                    <div className="camera-setup-issues">
+                        <Space
+                            direction="vertical"
+                            style={{ width: '100%' }}
+                            size={8}
+                        >
+                            <Text
+                                type="secondary"
+                                className="camera-setup-errors-hint"
+                            >
+                                <WarningOutlined style={{ marginRight: 6 }} />
+                                Don&apos;t worry about any issues
+                                below&mdash;we&apos;ll help you get these
+                                resolved.
+                            </Text>
+                            {errors.map((error) => (
+                                <Alert
+                                    key={error}
+                                    type="error"
+                                    message={error}
+                                    showIcon
+                                />
+                            ))}
+                        </Space>
+                    </div>
                 )}
             </Space>
 
@@ -148,4 +199,4 @@ function InternetSetup({ nextStep, previousStep }: Steppable) {
     );
 }
 
-export default InternetSetup;
+export default CameraSetup;

@@ -1,10 +1,17 @@
-import { HubConnection, HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr';
+import {
+    HubConnection,
+    HubConnectionBuilder,
+    HubConnectionState,
+} from '@microsoft/signalr';
 import log from 'electron-log';
 import Store from 'electron-store';
 import { AppConfig } from 'main/store';
 import { app } from 'electron';
 import { hostname } from 'os';
-import { EquipmentLogCategory, EquipmentLogDetails } from '../../models/EquipmentLog';
+import {
+    EquipmentLogCategory,
+    EquipmentLogDetails,
+} from '../../models/EquipmentLog';
 import { SetPendingAlerts } from '../events/Alerts';
 import { signalrToElectronLog } from '../util';
 
@@ -15,7 +22,10 @@ export default function setupSignalR(
     createAlertsWindowCallback: () => void
 ): Promise<void> {
     return new Promise((resolve, reject) => {
-        if (signalRConnection != null && signalRConnection.state === HubConnectionState.Connected) {
+        if (
+            signalRConnection != null &&
+            signalRConnection.state === HubConnectionState.Connected
+        ) {
             throw new Error('SignalR has already been initialized');
         }
 
@@ -76,23 +86,27 @@ export default function setupSignalR(
 }
 
 /*
-* Send the app version and hostname to the server
-*/
+ * Send the app version and hostname to the server
+ */
 function sendAppInfo() {
     invoke('AppInfo', {
         Version: app.getVersion(),
-        Hostname: hostname()
-    })
+        Hostname: hostname(),
+    });
 }
 
 /*
-* This function is used to invoke a SignalR event and wait for a response.
-* @param eventName The name of the event to invoke
-* @param eventResponse The name of the event to listen for the response
-* @param args Any arguments to pass to the event
-* @returns A promise that resolves with the response from the event
-*/
-function invokeExpectResponse<t>(eventName: string, eventResponse: string, ...args: any[]): Promise<t> {
+ * This function is used to invoke a SignalR event and wait for a response.
+ * @param eventName The name of the event to invoke
+ * @param eventResponse The name of the event to listen for the response
+ * @param args Any arguments to pass to the event
+ * @returns A promise that resolves with the response from the event
+ */
+function invokeExpectResponse<t>(
+    eventName: string,
+    eventResponse: string,
+    ...args: any[]
+): Promise<t> {
     return new Promise<t>((resolve, reject) => {
         if (signalRConnection == null) {
             reject();
@@ -102,7 +116,7 @@ function invokeExpectResponse<t>(eventName: string, eventResponse: string, ...ar
         const listener = (response: t) => {
             signalRConnection?.off(eventResponse, listener);
             resolve(response);
-        }
+        };
         signalRConnection.on(eventResponse, listener);
 
         signalRConnection.invoke(eventName, ...args).catch((err) => {
@@ -113,10 +127,10 @@ function invokeExpectResponse<t>(eventName: string, eventResponse: string, ...ar
 }
 
 /*
-* This function is used to invoke a SignalR event without waiting for a response.
-* @param eventName The name of the event to invoke
-* @param args Any arguments to pass to the event
-*/
+ * This function is used to invoke a SignalR event without waiting for a response.
+ * @param eventName The name of the event to invoke
+ * @param args Any arguments to pass to the event
+ */
 function invoke(eventName: string, ...args: any[]): void {
     if (signalRConnection == null) return;
 
@@ -126,10 +140,10 @@ function invoke(eventName: string, ...args: any[]): void {
 }
 
 /*
-* This function is used to invoke a SignalR event without waiting for a response.
-* @param eventName The name of the event to invoke
-* @param args Any arguments to pass to the event
-*/
+ * This function is used to invoke a SignalR event without waiting for a response.
+ * @param eventName The name of the event to invoke
+ * @param args Any arguments to pass to the event
+ */
 function invokeAsync(eventName: string, ...args: any[]): Promise<any> {
     if (signalRConnection == null) return Promise.resolve();
 
@@ -144,7 +158,10 @@ function invokeAsync(eventName: string, ...args: any[]): Promise<any> {
  * @param opts information about the log
  * @returns void
  */
-function invokeLog(message: string, opts: EquipmentLogDetails = { category: EquipmentLogCategory.General }): void {
+function invokeLog(
+    message: string,
+    opts: EquipmentLogDetails = { category: EquipmentLogCategory.General }
+): void {
     if (signalRConnection == null) return;
 
     signalRConnection.invoke('WriteLog', message, opts).catch((err) => {
@@ -153,11 +170,15 @@ function invokeLog(message: string, opts: EquipmentLogDetails = { category: Equi
 }
 
 /*
-* This function is used to register a listener for a SignalR event.
-* @param eventName The name of the event to listen for
-* @param listener The function to call when the event is received
-*/
-function registerListener<t>(eventName: string, listener: (response: t) => (Promise<any> | void)): void { // eslint-disable-line
+ * This function is used to register a listener for a SignalR event.
+ * @param eventName The name of the event to listen for
+ * @param listener The function to call when the event is received
+ */
+function registerListener<t>(
+    eventName: string,
+    listener: (response: t) => Promise<any> | void
+): void {
+    // eslint-disable-line
     if (signalRConnection == null) return;
 
     signalRConnection.on(eventName, listener);
@@ -168,12 +189,22 @@ function dismissAlert(id: string): void {
 
     log.info(signalRConnection.state);
 
-    signalRConnection.invoke('MarkAlertRead', id).then(() => {
-        log.info('finished dismissing');
-        return undefined;
-    }).catch((err) => {
-        log.error('Failed to dismiss alert', err);
-    });
+    signalRConnection
+        .invoke('MarkAlertRead', id)
+        .then(() => {
+            log.info('finished dismissing');
+            return undefined;
+        })
+        .catch((err) => {
+            log.error('Failed to dismiss alert', err);
+        });
 }
 
-export { dismissAlert, invokeExpectResponse, invoke, invokeAsync, invokeLog, registerListener };
+export {
+    dismissAlert,
+    invokeExpectResponse,
+    invoke,
+    invokeAsync,
+    invokeLog,
+    registerListener,
+};

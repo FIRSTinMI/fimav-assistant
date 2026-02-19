@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { RightOutlined } from '@ant-design/icons';
-import { Space } from 'antd';
-import Button from 'antd/es/button';
-import Typography from 'antd/es/typography';
+import { Button, Space, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { storeStep } from 'renderer/web_utils/step_manager';
 import StepManager from '../../components/StepManager';
 import Event from '../../../models/Event';
 import FiMLogo from '../../../../assets/fim_logo.png';
+import './index.css';
+
+const { Title } = Typography;
 
 function Welcome() {
     const nav = useNavigate();
@@ -15,7 +16,6 @@ function Welcome() {
     const [currentEvent, setCurrentEvent] = useState<Event | null>(null);
 
     useEffect(() => {
-        // Fire off HW check and register listener
         window.electron.ipcRenderer.on('new-event-info', (events: Event[]) => {
             console.log(events);
             const current = events.filter(
@@ -38,27 +38,19 @@ function Welcome() {
     return (
         <>
             <StepManager />
-            <Space direction="vertical" style={{ textAlign: 'center', width: '100%', height: '100%' }}>
+            <Space direction="vertical" className="welcome-page">
                 <img
-                    className="logo-bounce"
+                    className="logo-bounce welcome-logo"
                     src={FiMLogo}
-                    style={{
-                        maxWidth: '30%', 
-                        maxHeight: '80%', 
-                        height: '100%',
-                        marginTop: '5%',
-                        WebkitFilter: "drop-shadow(0px 0px 1px #FFFFFF",
-                        filter: "drop-shadow(0px 0px 1px #FFFFFF"
-                    }}
                     alt="FIRST in Michigan logo"
                 />
-                <Typography.Title level={1} style={{ marginTop: 0 }}>
+                <Title level={1} className="welcome-title">
                     Welcome!
-                </Typography.Title>
-                <Typography.Title level={5}>
+                </Title>
+                <Title level={5} className="welcome-subtitle">
                     Thank you for signing up to volunteer as AV for{' '}
                     {currentEvent?.name ?? 'FIRST in Michigan'}
-                </Typography.Title>
+                </Title>
 
                 <Button type="primary" size="large" onClick={handleNext}>
                     Let&apos;s Get Started{' '}

@@ -1,0 +1,45 @@
+/* Custom Styles For Internet Setup Page */
+
+.internet-setup-page {
+    text-align: center;
+    width: 100%;
+}
+
+.internet-setup-subtitle {
+    font-size: 15px;
+}
+
+.internet-setup-card {
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+.internet-setup-photo {
+    width: 70%;
+}
+
+.internet-setup-status-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.internet-setup-icon {
+    font-size: 20px;
+}
+
+.internet-setup-icon--ready {
+    color: #52c41a;
+}
+
+.internet-setup-icon--loading {
+    color: #1677ff;
+}
+
+.internet-setup-status {
+    font-size: 15px;
+}
+
+.internet-setup-errors-hint {
+    font-size: 13px;
+}

@@ -27,7 +27,7 @@ export function startAutoUpdate() {
 
 function restartIfNotRecording(): boolean {
     if (AutoAV.Instance.weAreRecording) return false;
-    
+
     autoUpdater.quitAndInstall();
     return true;
 }

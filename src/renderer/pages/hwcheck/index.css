@@ -1,0 +1,84 @@
+/* Custom Styles For HW Check Page */
+
+.hwcheck-page {
+    text-align: center;
+    width: 100%;
+}
+
+.hwcheck-header {
+    margin-bottom: 0;
+}
+
+.hwcheck-subtitle {
+    font-size: 15px;
+}
+
+.hwcheck-status-card {
+    max-width: 420px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.hwcheck-running {
+    text-align: center;
+    padding-top: 4px;
+}
+
+.hwcheck-running-text {
+    font-size: 13px;
+    margin-left: 6px;
+}
+
+.hwcheck-issues {
+    max-width: 560px;
+    margin: 0 auto;
+    text-align: left;
+}
+
+.hwcheck-issues-hint {
+    font-size: 13px;
+}
+
+.hwcheck-meanwhile-title {
+    margin-bottom: 16px;
+}
+
+.hwcheck-photo {
+    width: 85%;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.hwcheck-photo-label {
+    margin-top: 8px;
+}
+
+.check-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.check-item-icon {
+    font-size: 20px;
+}
+
+.check-item-label {
+    font-size: 15px;
+}
+
+.check-item-icon--ready {
+    color: #52c41a;
+}
+
+.check-item-icon--error {
+    color: #ff4d4f;
+}
+
+.check-item-icon--loading {
+    color: #1677ff;
+}

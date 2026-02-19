@@ -1,0 +1,18 @@
+/* Custom Styles For StepBar Component */
+
+.step-bar {
+    position: fixed;
+    bottom: 43px;
+    left: 0;
+    width: 100%;
+    padding-left: 10px;
+}
+
+.step-bar-next-col {
+    display: flex;
+}
+
+.step-bar-next-btn {
+    margin-left: auto;
+    margin-right: 5px;
+}

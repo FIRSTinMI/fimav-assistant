@@ -1,3 +1,5 @@
+import { IpConfigState } from './HWPingResponse';
+
 export default interface HWCheckResponse {
     audio_ready: boolean;
     venue_ip_ready: boolean;
@@ -17,6 +19,7 @@ export default interface HWCheckResponse {
         ptz2: boolean;
     };
     static_venue_ip: StaticIpInfo;
+    ip_config: IpConfigState;
 }
 
 export interface StaticIpInfo {

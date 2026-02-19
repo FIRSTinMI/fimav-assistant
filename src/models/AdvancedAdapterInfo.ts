@@ -115,8 +115,8 @@ export type NetAdapter = {
     ServiceLangT?: string;
     ServiceName?: string;
     ServiceDesc?: string;
-}
+};
 
 export type NetAdapterModel = {
     [adapterName: string]: NetAdapter;
-}
+};

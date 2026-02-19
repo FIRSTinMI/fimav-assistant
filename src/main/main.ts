@@ -168,7 +168,9 @@ if (!instanceLock) {
                     await setupSignalR(store, createAlertsWindow);
                 } catch {} // eslint-disable-line no-empty
             } else {
-                log.info('Skipping admin api connection because API key is not set');
+                log.info(
+                    'Skipping admin api connection because API key is not set'
+                );
             }
 
             // Create the main window
