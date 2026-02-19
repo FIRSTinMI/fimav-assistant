@@ -82,6 +82,10 @@
     white-space: nowrap;
 }
 
+.footer-alert-badge .ant-typography {
+    line-height: 1;
+}
+
 .footer-alert-badge--error {
     background: rgba(255, 77, 79, 0.15);
     color: #ff4d4f;

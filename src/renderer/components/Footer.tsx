@@ -84,19 +84,19 @@ export default function AppFooter() {
             {ipErrorCount > 0 && (
                 <span className="footer-alert-badge footer-alert-badge--error">
                     <ExclamationCircleOutlined />
-                    <span>
+                    <Text>
                         {ipErrorCount} IP{' '}
                         {ipErrorCount === 1 ? 'Error' : 'Errors'}
-                    </span>
+                    </Text>
                 </span>
             )}
             {ipWarnCount > 0 && (
                 <span className="footer-alert-badge footer-alert-badge--warning">
                     <ExclamationCircleOutlined />
-                    <span>
+                    <Text>
                         {ipWarnCount} IP{' '}
                         {ipWarnCount === 1 ? 'Warning' : 'Warnings'}
-                    </span>
+                    </Text>
                 </span>
             )}
         </div>

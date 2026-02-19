@@ -74,7 +74,7 @@ function StepBar({
                 {showPrev && (
                     <Button
                         type="primary"
-                        danger
+                        ghost
                         loading={loading}
                         size="large"
                         onClick={handlePrevious}
