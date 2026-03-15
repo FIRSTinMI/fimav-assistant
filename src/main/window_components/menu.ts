@@ -338,18 +338,18 @@ export default class MenuBuilder {
                     );
                     await VmixService.Instance.SetInputAudioAlwaysOn(input.key);
 
-                    const result = await dialog.showMessageBox({
-                        title: 'Additional Action Required',
-                        message:
-                            'Input created. Click "copy" to copy necessary CSS, then right click the input, go to properties, and paste.',
-                        type: 'info',
-                        buttons: ['Copy', 'Skip'],
-                        defaultId: 0,
-                    });
+                    // const result = await dialog.showMessageBox({
+                    //     title: 'Additional Action Required',
+                    //     message:
+                    //         'Input created. Click "copy" to copy necessary CSS, then right click the input, go to properties, and paste.',
+                    //     type: 'info',
+                    //     buttons: ['Copy', 'Skip'],
+                    //     defaultId: 0,
+                    // });
 
-                    if (result.response === 0) {
-                        clipboard.writeText('body {background: transparent;}');
-                    }
+                    // if (result.response === 0) {
+                    //     clipboard.writeText('body {background: transparent;}');
+                    // }
 
                     found = true;
                 }
