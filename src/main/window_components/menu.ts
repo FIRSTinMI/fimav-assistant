@@ -5,7 +5,6 @@ import {
     BrowserWindow,
     MenuItemConstructorOptions,
     dialog,
-    clipboard,
 } from 'electron';
 import Addons from 'main/addons';
 import { platform } from 'os';
