@@ -6,6 +6,15 @@ import { getStore } from '../main/store';
 
 export type FileNameMode = 'in-season' | 'off-season';
 
+// In an 8-alliance double elimination bracket, FMS numbers the 13 elimination
+// matches 1-13 and the finals from 14 up. Shared so file naming and FMS result
+// lookups agree on where finals begin.
+export const DOUBLE_ELIM_FINAL_START = 14;
+
+export function isDoubleElimFinal(matchNumber: number): boolean {
+    return matchNumber >= DOUBLE_ELIM_FINAL_START;
+}
+
 const fileNameBuilders: Record<
     FileNameMode,
     (_event: Event | null, _matchStatus: FMSMatchStatus) => string
@@ -21,8 +30,10 @@ const fileNameBuilders: Record<
                 break;
             case 'Playoff':
                 // TODO: Make this more resilient to playoff types other than 8-alliance double elim
-                if (matchStatus.MatchNumber >= 14) {
-                    match = `F1M${matchStatus.MatchNumber - 13}`;
+                if (isDoubleElimFinal(matchStatus.MatchNumber)) {
+                    match = `F1M${
+                        matchStatus.MatchNumber - (DOUBLE_ELIM_FINAL_START - 1)
+                    }`;
                 } else {
                     match = `SF${matchStatus.MatchNumber}M1`;
                 }

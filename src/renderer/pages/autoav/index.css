@@ -1,0 +1,47 @@
+.autoav-page {
+    padding: 16px 20px 24px;
+    text-align: left;
+}
+
+.autoav-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+@media (max-width: 720px) {
+    .autoav-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+.file-name {
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+}
+
+.team-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.team-trio {
+    display: flex;
+    gap: 8px;
+    font-variant-numeric: tabular-nums;
+}
+
+.team-trio--red span {
+    color: #ff7875;
+}
+
+.team-trio--blue span {
+    color: #69b1ff;
+}
+
+.team-carded {
+    font-weight: 700;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}

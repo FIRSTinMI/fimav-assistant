@@ -1,0 +1,39 @@
+.tab-bar {
+    display: flex;
+    align-items: stretch;
+    height: 44px;
+    background: #1d1d1d;
+    border-bottom: 1px solid #303030;
+    padding: 0 8px;
+    gap: 4px;
+    -webkit-app-region: drag;
+}
+
+.tab-item {
+    -webkit-app-region: no-drag;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 14px;
+    padding: 0 16px;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.tab-item:hover {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.tab-item--active {
+    color: #fff;
+    border-bottom-color: #1668dc;
+}
+
+.tab-icon {
+    display: inline-flex;
+    font-size: 16px;
+}

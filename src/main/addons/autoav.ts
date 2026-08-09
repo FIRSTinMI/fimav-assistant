@@ -1,4 +1,5 @@
 import EventEmitter from 'events';
+import path from 'path';
 import { HubConnection, HubConnectionBuilder } from '@microsoft/signalr';
 import nodeFetch from 'node-fetch';
 import log from 'electron-log';
@@ -8,12 +9,21 @@ import {
     EquipmentLogType,
 } from '../../models/EquipmentLog';
 import FMSMatchStatus from '../../models/FMSMatchState';
-import attemptRename from '../../utils/recording';
+import attemptRename, { FileNameMode } from '../../utils/recording';
 import { AddonLoggers } from './addon-loggers';
 import { getCurrentEvent, signalrToElectronLog } from '../util';
 import VmixService from '../../services/VmixService';
+import FmsApi from '../../services/FmsApi';
 import Event from '../../models/Event';
+import { AutoAVStatus } from '../../models/AutoAVStatus';
+import { MatchRecord } from '../../models/MatchRecord';
+import { upsertMatch, updateMatch } from '../recordings/matchStore';
+import { getStore } from '../store';
 import { invokeExpectResponse, invokeLog } from '../window_components/signalR';
+
+// Events AutoAV emits to the renderer: a human status line, a structured
+// status snapshot, and match-record upserts.
+export type AutoAVEvent = 'info' | 'status' | 'match';
 
 export default class AutoAV {
     private static instance: AutoAV;
@@ -45,6 +55,23 @@ export default class AutoAV {
     // Event Emitter
     private emitter: EventEmitter = new EventEmitter();
 
+    // Structured status surfaced to the Auto AV tab
+    private status: AutoAVStatus = {
+        fmsConnected: false,
+        vmix: { reachable: false, recording: false },
+        recordingActive: false,
+        currentEvent: null,
+        saveFolder: null,
+        fileNameMode: 'in-season',
+        lastMessage: null,
+    };
+
+    // Id of the MatchRecord for the in-progress recording, so we can patch it on stop
+    private currentRecordId: string | null = null;
+
+    // Periodic vMix reachability poll
+    private vmixPollTimer: ReturnType<typeof setInterval> | null = null;
+
     constructor() {
         // Start new log files
         this.logs = {
@@ -73,9 +100,16 @@ export default class AutoAV {
                 this.logRecording('🟥 Stopped Recording');
                 this.weAreRecording = false;
                 this.willStopRecording = false;
+                this.status.recordingActive = false;
+                this.status.vmix.recording = false;
+                this.emitStatus();
 
                 // If we don't have a start time or data, don't try to rename
                 if (!this.lastMatchStartData) return undefined;
+
+                // Keep a local handle; the fields below get reset in finally
+                const matchData = this.lastMatchStartData;
+                const recordId = this.currentRecordId;
 
                 // If we don't have an event name, try to get it
                 if (!this.currentEvent) {
@@ -85,6 +119,7 @@ export default class AutoAV {
                         EquipmentLogType.Warn
                     );
                     this.currentEvent = await this.fetchEvent();
+                    this.emitStatus();
                 }
 
                 // Attempt to rename the file
@@ -92,18 +127,46 @@ export default class AutoAV {
                     const filename = await attemptRename(
                         this.currentEvent,
                         this.currentFile,
-                        this.lastMatchStartData
+                        matchData
                     );
 
                     this.logRecording(`Renamed last recording to ${filename}`);
+
+                    // Patch the record with its final location
+                    if (recordId) {
+                        const saveFolder = path.dirname(filename);
+                        this.status.saveFolder = saveFolder;
+                        const record = updateMatch(recordId, {
+                            fileName: path.basename(filename),
+                            filePath: filename,
+                            saveFolder,
+                            endedAt: Date.now(),
+                            status: 'recorded',
+                        });
+                        if (record) this.emitter.emit('match', record);
+                        this.emitStatus();
+
+                        // Best-effort metadata capture (teams + cards). Runs
+                        // after the rename so a failed fetch never risks the file.
+                        this.captureMetadata(recordId, matchData);
+                    }
                 } catch (err: any) {
                     this.logRecording(
                         `‼️ Error Renaming Recording`,
                         err,
                         EquipmentLogType.Error
                     );
+                    if (recordId) {
+                        const record = updateMatch(recordId, {
+                            status: 'error',
+                            error: String(err?.message ?? err),
+                            endedAt: Date.now(),
+                        });
+                        if (record) this.emitter.emit('match', record);
+                    }
                 } finally {
                     this.lastMatchStartData = null;
+                    this.currentRecordId = null;
                 }
 
                 return undefined;
@@ -130,6 +193,30 @@ export default class AutoAV {
                 this.lastMatchStartData = matchInfo;
                 this.weAreRecording = true;
 
+                // Create a record for this match so it shows in the Auto AV tab
+                const startedAt = Date.now();
+                const record: MatchRecord = {
+                    id: `${matchInfo.Level}_${matchInfo.MatchNumber}_${matchInfo.PlayNumber}_${startedAt}`,
+                    level: matchInfo.Level,
+                    matchNumber: matchInfo.MatchNumber,
+                    playNumber: matchInfo.PlayNumber,
+                    eventName: this.currentEvent?.name ?? 'Unknown Event',
+                    eventCode: this.currentEvent?.code ?? null,
+                    fileName: null,
+                    filePath: null,
+                    saveFolder: null,
+                    startedAt,
+                    endedAt: null,
+                    status: 'recording',
+                };
+                this.currentRecordId = record.id;
+                upsertMatch(record);
+                this.emitter.emit('match', record);
+
+                this.status.recordingActive = true;
+                this.status.vmix.recording = true;
+                this.emitStatus();
+
                 // Give it some time, then attempt to find the file
                 setTimeout(async () => {
                     this.currentFile =
@@ -151,6 +238,9 @@ export default class AutoAV {
     public start() {
         // Notify Parent logs that we're running
         this.log('AutoAV Service Started', undefined, true);
+
+        // Begin polling vMix reachability for the status tab
+        this.startVmixPoll();
 
         // Build a connection to the SignalR Hub
         this.hubConnection = new HubConnectionBuilder()
@@ -276,6 +366,8 @@ export default class AutoAV {
 
         // Register connected/disconnected events
         this.hubConnection.onreconnecting(() => {
+            this.status.fmsConnected = false;
+            this.emitStatus();
             this.logFMS(
                 'AutoAV FMS Connection Lost, Reconnecting',
                 undefined,
@@ -283,7 +375,13 @@ export default class AutoAV {
                 true
             );
         });
+        this.hubConnection.onreconnected(() => {
+            this.status.fmsConnected = true;
+            this.emitStatus();
+        });
         this.hubConnection.onclose(() => {
+            this.status.fmsConnected = false;
+            this.emitStatus();
             this.logFMS(
                 'AutoAV FMS Connection Closed!',
                 undefined,
@@ -296,6 +394,8 @@ export default class AutoAV {
         this.hubConnection
             .start()
             .then(() => {
+                this.status.fmsConnected = true;
+                this.emitStatus();
                 this.logFMS(
                     'FMS Connection Established!',
                     undefined,
@@ -306,6 +406,8 @@ export default class AutoAV {
                 return undefined;
             })
             .catch((err) => {
+                this.status.fmsConnected = false;
+                this.emitStatus();
                 this.logFMS(
                     `AutoAV FMS Connection Failed. Restarting...`,
                     err,
@@ -326,6 +428,11 @@ export default class AutoAV {
         // Log stopping
         this.log('AutoAV Service Stopped');
         this.emitter.emit('info', 'Service Stopped');
+        // Stop polling vMix
+        this.stopVmixPoll();
+        this.status.fmsConnected = false;
+        this.status.vmix = { reachable: false, recording: false };
+        this.emitStatus();
         // Stop the SignalR Hub connection
         this.hubConnection?.stop();
     }
@@ -434,7 +541,9 @@ export default class AutoAV {
 
         // Log to frontend
         if (notifyClient) {
+            this.status.lastMessage = msg;
             this.emitter.emit('info', msg);
+            this.emitStatus();
         }
 
         // Don't send debug to logging server, too verbose
@@ -455,6 +564,104 @@ export default class AutoAV {
     // Set the event name
     public setEvent(event: Event | null) {
         this.currentEvent = event;
+        this.emitStatus();
+    }
+
+    // Effective file naming mode: official events are always in-season,
+    // unofficial always off-season, otherwise fall back to the stored setting.
+    private effectiveFileNameMode(): FileNameMode {
+        if (this.currentEvent?.isOfficial === false) return 'off-season';
+        if (this.currentEvent?.isOfficial === true) return 'in-season';
+        return getStore().get('autoAv.fileNameMode', 'in-season');
+    }
+
+    // Build and broadcast the current status snapshot
+    private emitStatus() {
+        this.status.currentEvent = this.currentEvent
+            ? {
+                  name: this.currentEvent.name,
+                  code: this.currentEvent.code ?? null,
+              }
+            : null;
+        this.status.fileNameMode = this.effectiveFileNameMode();
+        this.emitter.emit('status', this.getStatus());
+    }
+
+    // Current status snapshot (for IPC getState)
+    public getStatus(): AutoAVStatus {
+        return {
+            ...this.status,
+            vmix: { ...this.status.vmix },
+            currentEvent: this.status.currentEvent
+                ? { ...this.status.currentEvent }
+                : null,
+        };
+    }
+
+    // Poll vMix so the tab can show whether it's reachable / recording
+    private startVmixPoll() {
+        this.stopVmixPoll();
+        this.vmixPollTimer = setInterval(() => this.pollVmix(), 5000);
+        this.pollVmix();
+    }
+
+    private stopVmixPoll() {
+        if (this.vmixPollTimer) {
+            clearInterval(this.vmixPollTimer);
+            this.vmixPollTimer = null;
+        }
+    }
+
+    private async pollVmix() {
+        let reachable = false;
+        let recording = false;
+        try {
+            const parsed = await VmixService.Instance.GetBase();
+            reachable = !!parsed?.vmix;
+            recording = parsed?.vmix?.recording?.['#text'] === 'True';
+        } catch {
+            reachable = false;
+            recording = false;
+        }
+        if (
+            this.status.vmix.reachable !== reachable ||
+            this.status.vmix.recording !== recording
+        ) {
+            this.status.vmix = { reachable, recording };
+            this.emitStatus();
+        }
+    }
+
+    // Best-effort fetch of teams + card status for a finished match, patched
+    // onto the record after it's been renamed. Never throws into the stop path.
+    private async captureMetadata(recordId: string, matchData: FMSMatchStatus) {
+        try {
+            const results = await FmsApi.Instance.getMatchResults(
+                matchData.Level,
+                matchData.MatchNumber
+            );
+            if (!results) return;
+            const record = updateMatch(recordId, {
+                teams: results.teams,
+                hasCard: results.hasCard,
+            });
+            if (record) {
+                this.emitter.emit('match', record);
+                this.logRecording(
+                    `Captured metadata for ${matchData.Level} Match ${
+                        matchData.MatchNumber
+                    }${results.hasCard ? ' (card issued)' : ''}`,
+                    undefined,
+                    EquipmentLogType.Debug
+                );
+            }
+        } catch (err) {
+            this.logRecording(
+                'Failed to capture match metadata',
+                err as object,
+                EquipmentLogType.Warn
+            );
+        }
     }
 
     public static get Instance(): AutoAV {
@@ -463,17 +670,17 @@ export default class AutoAV {
     }
 
     // eslint-disable-next-line no-unused-vars
-    public on(event: 'info', listener: (arg: string) => void) {
+    public on(event: AutoAVEvent, listener: (arg: any) => void) {
         this.emitter.on(event, listener);
     }
 
     // eslint-disable-next-line no-unused-vars
-    public off(event: 'info', listener: (arg: string) => void) {
+    public off(event: AutoAVEvent, listener: (arg: any) => void) {
         this.emitter.off(event, listener);
     }
 
     // eslint-disable-next-line no-unused-vars
-    public once(event: 'info', listener: (arg: string) => void) {
+    public once(event: AutoAVEvent, listener: (arg: any) => void) {
         this.emitter.once(event, listener);
     }
 }

@@ -16,6 +16,9 @@ import HWPing from './addons/hw-ping';
 import { getStore } from './store';
 import Event from '../models/Event';
 import AutoAV from './addons/autoav';
+import { AutoAVStatus } from '../models/AutoAVStatus';
+import { MatchRecord } from '../models/MatchRecord';
+import { listMatches, clearMatches } from './recordings/matchStore';
 import { StaticIpInfo } from '../models/HWCheckResponse';
 import { getCurrentEvent } from './util';
 
@@ -216,6 +219,29 @@ export default function registerAllEvents(window: BrowserWindow | null) {
             val: info,
         });
         lastAutoAV = info;
+    });
+
+    // Forward structured AutoAV status + match records to the Auto AV tab
+    let lastAutoAvStatus: AutoAVStatus = AutoAV.Instance.getStatus();
+    AutoAV.Instance.on('status', (status: AutoAVStatus) => {
+        lastAutoAvStatus = status;
+        window?.webContents.send('autoav:status', status);
+    });
+
+    AutoAV.Instance.on('match', (record: MatchRecord) => {
+        window?.webContents.send('autoav:match', record);
+    });
+
+    // The Auto AV tab requests the full current state on mount
+    ipcMain.on('autoav:getState', (event) => {
+        event.reply('autoav:status', lastAutoAvStatus);
+        event.reply('autoav:matches', listMatches());
+    });
+
+    // Manual/dev reset of the recorded-match history
+    ipcMain.on('autoav:clearMatches', (event) => {
+        clearMatches();
+        event.reply('autoav:matches', listMatches());
     });
 
     // Register a listener for the backend status.  Any time the renderer sends this event, we'll send the current status of the backend

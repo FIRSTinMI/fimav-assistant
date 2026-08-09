@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { ConfigProvider, theme } from 'antd';
 import './App.css';
-import AppRoutes from './AppRoutes';
+import AppRoutes, { AppRouter } from './AppRoutes';
 import StatusContext, { StatusContextType } from './hooks/status_state';
 import BackendStatusSync from './components/BackendStatusSync';
 import AppFooter from './components/Footer';
+import TabBar from './components/TabBar';
 
 export default function App() {
     const [status, setStatus] = useState<StatusContextType>({
@@ -38,12 +39,19 @@ export default function App() {
             <StatusContext.Provider value={contextValue}>
                 <BackendStatusSync />
 
-                <div
-                    className="pretty-scroll"
-                    style={{ height: 'calc(100vh - 40px)', overflowY: 'auto' }}
-                >
-                    <AppRoutes />
-                </div>
+                <AppRouter>
+                    <TabBar />
+
+                    <div
+                        className="pretty-scroll"
+                        style={{
+                            height: 'calc(100vh - 40px - 44px)',
+                            overflowY: 'auto',
+                        }}
+                    >
+                        <AppRoutes />
+                    </div>
+                </AppRouter>
 
                 <AppFooter />
             </StatusContext.Provider>
