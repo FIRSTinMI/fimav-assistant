@@ -1,0 +1,79 @@
+.vmix-page {
+    padding: 16px 20px 24px;
+    text-align: left;
+}
+
+.vmix-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+@media (max-width: 720px) {
+    .vmix-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+.vmix-cards .ant-card {
+    background: transparent;
+}
+
+.vmix-status-icon {
+    color: rgba(255, 255, 255, 0.55);
+    display: inline-flex;
+}
+
+.vmix-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.vmix-dot--off {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.vmix-dot--on {
+    box-shadow: 0 0 0 3px rgba(255, 77, 79, 0.18);
+}
+
+.vmix-dim {
+    font-size: 12px;
+}
+
+.vmix-stream-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vmix-stream-total {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-top: 8px;
+    margin-top: 2px;
+}
+
+.vmix-spark-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.vmix-sparkline {
+    display: block;
+}
+
+.vmix-key-mismatch {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 10px;
+    border: 1px solid rgba(255, 77, 79, 0.3);
+    background: rgba(255, 77, 79, 0.1);
+    border-radius: 6px;
+}

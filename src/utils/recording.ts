@@ -6,6 +6,15 @@ import { getStore } from '../main/store';
 
 export type FileNameMode = 'in-season' | 'off-season';
 
+// In an 8-alliance double elimination bracket, FMS numbers the 13 elimination
+// matches 1-13 and the finals from 14 up. Shared so file naming and FMS result
+// lookups agree on where finals begin.
+export const DOUBLE_ELIM_FINAL_START = 14;
+
+export function isDoubleElimFinal(matchNumber: number): boolean {
+    return matchNumber >= DOUBLE_ELIM_FINAL_START;
+}
+
 const fileNameBuilders: Record<
     FileNameMode,
     (_event: Event | null, _matchStatus: FMSMatchStatus) => string
@@ -21,8 +30,10 @@ const fileNameBuilders: Record<
                 break;
             case 'Playoff':
                 // TODO: Make this more resilient to playoff types other than 8-alliance double elim
-                if (matchStatus.MatchNumber >= 14) {
-                    match = `F1M${matchStatus.MatchNumber - 13}`;
+                if (isDoubleElimFinal(matchStatus.MatchNumber)) {
+                    match = `F1M${
+                        matchStatus.MatchNumber - (DOUBLE_ELIM_FINAL_START - 1)
+                    }`;
                 } else {
                     match = `SF${matchStatus.MatchNumber}M1`;
                 }
@@ -53,6 +64,26 @@ const fileNameBuilders: Record<
     },
 };
 
+// The per-event folder name recordings are filed into, e.g. "2026 <Event>".
+// Shared so the Auto AV tab shows the same folder attemptRename will create.
+export function eventFolderName(event: Event | null): string {
+    return `${new Date().getFullYear()} ${event?.name ?? 'Unknown Event'}`;
+}
+
+// An example output filename for the given event + naming mode, for showing the
+// user what their files will look like (a Qualification match 1 sample).
+export function sampleFileName(
+    event: Event | null,
+    mode: FileNameMode
+): string {
+    const sample = {
+        Level: 'Qualification',
+        MatchNumber: 1,
+        PlayNumber: 1,
+    } as FMSMatchStatus;
+    return fileNameBuilders[mode](event, sample);
+}
+
 export default async function attemptRename(
     event: Event | null,
     videoLocation: string | null,
@@ -82,26 +113,66 @@ export default async function attemptRename(
                 builder = 'in-season';
             }
 
-            const newFileName = fileNameBuilders[builder](event, matchStatus);
+            // Manual overrides from settings: a typed event name always wins,
+            // and an explicit save folder redirects where files land.
+            const nameOverride = getStore()
+                .get('autoAv.eventNameOverride', '')
+                .trim();
+            const saveFolderOverride = getStore()
+                .get('autoAv.saveFolder', '')
+                .trim();
 
-            // Check if event name folder exists (videoLocation has the file name at the end, so we must "go up" one directory)
+            const effectiveEvent: Event | null = nameOverride
+                ? ({
+                      ...(event ?? {}),
+                      name: nameOverride,
+                      code: nameOverride,
+                  } as Event)
+                : event;
+
+            const newFileName = fileNameBuilders[builder](
+                effectiveEvent,
+                matchStatus
+            );
+
+            // Event-named folder, under the configured save folder if set,
+            // otherwise alongside the vMix recording (videoLocation ends in the
+            // file name, so "../" gives its directory).
+            const baseFolder = saveFolderOverride
+                ? path.resolve(saveFolderOverride)
+                : path.resolve(videoLocation, '../');
             const eventFolder = path.resolve(
-                videoLocation,
-                '../',
-                `${new Date().getFullYear()} ${event?.name ?? 'Unknown Event'}`
+                baseFolder,
+                `${new Date().getFullYear()} ${
+                    effectiveEvent?.name ?? 'Unknown Event'
+                }`
             );
             if (!fs.existsSync(eventFolder)) {
-                fs.mkdirSync(eventFolder);
+                fs.mkdirSync(eventFolder, { recursive: true });
             }
 
-            // Rename and move the file
-            fs.renameSync(
-                path.resolve(videoLocation),
-                path.resolve(eventFolder, newFileName)
-            );
+            const target = path.resolve(eventFolder, newFileName);
+            const source = path.resolve(videoLocation);
+
+            // Rename/move the file; fall back to copy+delete across drives
+            // (renameSync throws EXDEV when the save folder is on another disk).
+            try {
+                fs.renameSync(source, target);
+            } catch (err) {
+                if ((err as { code?: string }).code === 'EXDEV') {
+                    fs.copyFileSync(source, target);
+                    fs.unlinkSync(source);
+                } else {
+                    throw err;
+                }
+            }
+
+            // Remember the real folder so the Auto AV tab can show the exact
+            // path even when no save folder is configured.
+            getStore().set('autoAv.lastSaveFolder', eventFolder);
 
             // Resolve
-            resolve(path.resolve(eventFolder, newFileName));
+            resolve(target);
         } catch (e) {
             reject(e);
         }

@@ -80,7 +80,7 @@ export default function AppFooter() {
 
             <div className="footer-spacer" />
 
-            {/* IP alert badges — right-aligned */}
+            {/* IP alert badges - right-aligned */}
             {ipErrorCount > 0 && (
                 <span className="footer-alert-badge footer-alert-badge--error">
                     <ExclamationCircleOutlined />
