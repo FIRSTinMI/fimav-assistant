@@ -1,24 +1,29 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    Badge,
     Button,
     Card,
     Empty,
-    Popconfirm,
+    Form,
+    Input,
+    Modal,
+    Select,
     Space,
+    Switch,
     Table,
     Tag,
     Typography,
+    message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import {
-    CheckCircleTwoTone,
-    CloseCircleTwoTone,
+    CheckCircleFilled,
+    CloseCircleFilled,
     FolderOpenOutlined,
-    VideoCameraOutlined,
+    ScissorOutlined,
 } from '@ant-design/icons';
 import { AutoAVStatus } from 'models/AutoAVStatus';
 import { MatchRecord, MatchTeam } from 'models/MatchRecord';
+import AddonControlRow from '../../components/AddonControlRow';
 import './index.css';
 
 const { Title, Text } = Typography;
@@ -53,22 +58,110 @@ function mergeMatch(list: MatchRecord[], rec: MatchRecord): MatchRecord[] {
     return next.sort((a, b) => b.startedAt - a.startedAt);
 }
 
+function CutCell({ record }: { record: MatchRecord }) {
+    const triggerCut = () =>
+        window.electron?.ipcRenderer.sendMessage('autoav:cutMatch', [
+            record.saveFolder,
+            record.id,
+        ]);
+    const reveal = (target?: string) =>
+        window.electron?.ipcRenderer.sendMessage('autoav:revealFile', [target]);
+
+    // Only recorded matches with a file can be cut.
+    if (record.status !== 'recorded' || !record.filePath) {
+        return <Text type="secondary">-</Text>;
+    }
+
+    // Carded matches are never cut: the card explanation lives in the dead time.
+    if (record.hasCard) {
+        return (
+            <span title="Card issued, kept whole to preserve the explanation">
+                <Tag color="gold">Kept (card)</Tag>
+            </span>
+        );
+    }
+
+    const p = record.processing;
+    if (p?.state === 'queued') {
+        return <Tag>Queued</Tag>;
+    }
+    if (p?.state === 'processing') {
+        return <Tag color="processing">Cutting</Tag>;
+    }
+    if (p?.state === 'done') {
+        return (
+            <Button
+                type="link"
+                size="small"
+                icon={<FolderOpenOutlined />}
+                style={{ padding: 0, height: 'auto' }}
+                title={p.outputPath ?? undefined}
+                onClick={() => reveal(p.outputPath)}
+            >
+                Show cut
+            </Button>
+        );
+    }
+    if (p?.state === 'error') {
+        return (
+            <Space size={8}>
+                <span title={p.error ?? undefined}>
+                    <Tag color="error">Failed</Tag>
+                </span>
+                <Button
+                    type="link"
+                    size="small"
+                    style={{ padding: 0, height: 'auto' }}
+                    onClick={triggerCut}
+                >
+                    Retry
+                </Button>
+            </Space>
+        );
+    }
+    // Not cut yet: offer the manual trigger.
+    return (
+        <Button
+            type="link"
+            size="small"
+            icon={<ScissorOutlined />}
+            style={{ padding: 0, height: 'auto' }}
+            onClick={triggerCut}
+        >
+            Cut
+        </Button>
+    );
+}
+
 function StatusBadge({ ok, label }: { ok: boolean; label: string }) {
     return (
         <Space size={6}>
             {ok ? (
-                <CheckCircleTwoTone twoToneColor="#52c41a" />
+                <CheckCircleFilled style={{ color: '#52c41a' }} />
             ) : (
-                <CloseCircleTwoTone twoToneColor="#ff4d4f" />
+                <CloseCircleFilled style={{ color: '#ff4d4f' }} />
             )}
             <Text>{label}</Text>
         </Space>
     );
 }
 
+function RecordingBadge({ recording }: { recording: boolean }) {
+    return (
+        <Space size={6}>
+            <span
+                className={`rec-dot ${
+                    recording ? 'rec-dot--live' : 'rec-dot--idle'
+                }`}
+            />
+            <Text>vMix recording</Text>
+        </Space>
+    );
+}
+
 function TeamCell({ teams }: { teams: MatchRecord['teams'] }) {
     if (!teams || (teams.red.length === 0 && teams.blue.length === 0)) {
-        return <Text type="secondary">—</Text>;
+        return <Text type="secondary">-</Text>;
     }
     const renderTrio = (trio: MatchTeam[], className: string) => (
         <div className={className}>
@@ -100,7 +193,7 @@ function CardCell({ record }: { record: MatchRecord }) {
         return <Text type="secondary">None</Text>;
     }
     if (carded.length === 0) {
-        return <Text type="secondary">—</Text>;
+        return <Text type="secondary">-</Text>;
     }
     return (
         <Space size={4} wrap>
@@ -116,18 +209,146 @@ function CardCell({ record }: { record: MatchRecord }) {
     );
 }
 
+interface AutoAvSettings {
+    fileNameMode: 'in-season' | 'off-season';
+    eventNameOverride: string;
+    saveFolder: string;
+    autoCut: boolean;
+}
+
+function SettingsDialog({
+    open,
+    onClose,
+}: {
+    open: boolean;
+    onClose: () => void;
+}) {
+    const [form] = Form.useForm<AutoAvSettings>();
+    const [loading, setLoading] = useState(true);
+
+    // Load current settings whenever the dialog opens.
+    useEffect(() => {
+        if (!open || !window.electron) return undefined;
+        const { ipcRenderer } = window.electron;
+        setLoading(true);
+        const off = ipcRenderer.on(
+            'autoav:settings',
+            (s: AutoAvSettings) => {
+                form.setFieldsValue(s);
+                setLoading(false);
+            }
+        );
+        ipcRenderer.sendMessage('autoav:getSettings', []);
+        return off;
+    }, [open, form]);
+
+    const pickFolder = useCallback(() => {
+        if (!window.electron) return;
+        const { ipcRenderer } = window.electron;
+        const off = ipcRenderer.on('autoav:folderPicked', (folder: string) => {
+            off();
+            form.setFieldValue('saveFolder', folder);
+        });
+        ipcRenderer.sendMessage('autoav:pickFolder', []);
+    }, [form]);
+
+    const save = useCallback(async () => {
+        const values = await form.validateFields();
+        window.electron?.ipcRenderer.sendMessage('autoav:saveSettings', [
+            values,
+        ]);
+        message.success('Settings saved');
+        onClose();
+    }, [form, onClose]);
+
+    return (
+        <Modal
+            title="Auto AV settings"
+            open={open}
+            onCancel={onClose}
+            onOk={save}
+            okText="Save"
+            confirmLoading={loading}
+            destroyOnClose
+        >
+            <Form
+                form={form}
+                layout="vertical"
+                disabled={loading}
+                style={{ marginTop: 12 }}
+            >
+                <Form.Item
+                    label="Event name"
+                    name="eventNameOverride"
+                    tooltip="Typed here, this always overrides the event name FMS reports and is used in the file name and folder. Leave blank to use FMS."
+                >
+                    <Input placeholder="e.g. Wolverine Robotics Competition" />
+                </Form.Item>
+
+                <Form.Item
+                    label="Save folder"
+                    name="saveFolder"
+                    tooltip="Where renamed match videos are moved. Blank = alongside the vMix recording. A per-event subfolder is created inside this."
+                >
+                    <Input
+                        placeholder="(blank = next to the vMix recording)"
+                        addonAfter={
+                            <Button
+                                type="text"
+                                size="small"
+                                icon={<FolderOpenOutlined />}
+                                onClick={pickFolder}
+                                style={{ height: 'auto', padding: 0 }}
+                            >
+                                Browse
+                            </Button>
+                        }
+                    />
+                </Form.Item>
+
+                <Form.Item
+                    label="File naming style"
+                    name="fileNameMode"
+                    tooltip="Official events force in-season naming automatically; this is the fallback. In-season: QM13_Event.mp4. Off-season: 2026 Event - Qualification Match 13.mp4."
+                >
+                    <Select
+                        options={[
+                            { value: 'in-season', label: 'In-season (short codes)' },
+                            {
+                                value: 'off-season',
+                                label: 'Off-season (readable)',
+                            },
+                        ]}
+                    />
+                </Form.Item>
+
+                <Form.Item
+                    label="Auto-cut dead time"
+                    name="autoCut"
+                    valuePropName="checked"
+                    tooltip="After each match records, remove the dead time and keep the trimmed video in the event folder; the raw original is moved into an Originals subfolder. Matches with a card are always kept whole so the card explanation survives. Re-encodes on this machine, so leave off if vMix needs all the CPU during the event."
+                >
+                    <Switch />
+                </Form.Item>
+            </Form>
+        </Modal>
+    );
+}
+
 export default function AutoAVPage() {
     const [status, setStatus] = useState<AutoAVStatus | null>(null);
     const [matches, setMatches] = useState<MatchRecord[]>([]);
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const [addonBusy, setAddonBusy] = useState(false);
 
     useEffect(() => {
         if (!window.electron) return undefined;
         const { ipcRenderer } = window.electron;
 
-        const offStatus = ipcRenderer.on(
-            'autoav:status',
-            (s: AutoAVStatus) => setStatus(s)
-        );
+        const offStatus = ipcRenderer.on('autoav:status', (s: AutoAVStatus) => {
+            setStatus(s);
+            setAddonBusy(false);
+        });
         const offMatches = ipcRenderer.on(
             'autoav:matches',
             (list: MatchRecord[]) =>
@@ -152,6 +373,16 @@ export default function AutoAVPage() {
         () => matches.find((m) => m.status === 'recording'),
         [matches]
     );
+
+    const restartAddon = useCallback(() => {
+        setAddonBusy(true);
+        window.electron?.ipcRenderer.sendMessage('autoav:restart', []);
+    }, []);
+
+    const stopAddon = useCallback(() => {
+        setAddonBusy(true);
+        window.electron?.ipcRenderer.sendMessage('autoav:stopAddon', []);
+    }, []);
 
     const working = !!status?.fmsConnected && !!status?.vmix.reachable;
 
@@ -183,7 +414,7 @@ export default function AutoAVPage() {
                         {m.fileName}
                     </Text>
                 ) : (
-                    <Text type="secondary">—</Text>
+                    <Text type="secondary">-</Text>
                 ),
         },
         {
@@ -207,27 +438,29 @@ export default function AutoAVPage() {
                 );
             },
         },
+        {
+            title: 'Cut',
+            key: 'cut',
+            render: (_, m) => <CutCell record={m} />,
+        },
     ];
 
-    return (
-        <div className="autoav-page">
-            <Space
-                align="center"
-                style={{
-                    width: '100%',
-                    justifyContent: 'space-between',
-                    marginBottom: 12,
-                }}
-            >
-                <Title level={3} style={{ margin: 0 }}>
-                    <VideoCameraOutlined /> Auto AV
-                </Title>
-                <Badge
-                    status={working ? 'success' : 'error'}
-                    text={working ? 'Working' : 'Not ready'}
-                />
-            </Space>
+    let statusLabel = 'Stopped';
+    if (working) statusLabel = 'Working';
+    else if (status?.running) statusLabel = 'Running';
 
+    return (
+        <>
+            <AddonControlRow
+                running={!!status?.running}
+                statusLabel={statusLabel}
+                onStart={restartAddon}
+                onRestart={restartAddon}
+                onStop={stopAddon}
+                onSettings={() => setSettingsOpen(true)}
+                busy={addonBusy}
+            />
+            <div className="autoav-page">
             <div className="autoav-cards">
                 <Card size="small" title="Status">
                     <Space direction="vertical" size={8}>
@@ -239,79 +472,64 @@ export default function AutoAVPage() {
                             ok={!!status?.vmix.reachable}
                             label="vMix reachable"
                         />
-                        <StatusBadge
-                            ok={!!status?.vmix.recording}
-                            label="vMix recording"
+                        <RecordingBadge
+                            recording={!!status?.vmix.recording}
                         />
                         {recordingMatch && (
                             <Text type="warning">
                                 Recording now: {matchLabel(recordingMatch)}
                             </Text>
                         )}
-                        {status?.lastMessage && (
-                            <Text type="secondary">{status.lastMessage}</Text>
-                        )}
                     </Space>
                 </Card>
 
-                <Card size="small" title="Detected event">
+                <Card size="small" title="Recording settings">
                     <Space direction="vertical" size={8}>
                         <Text strong>
                             {status?.currentEvent?.name ?? 'No event detected'}
                         </Text>
-                        {status?.currentEvent?.code && (
-                            <Text type="secondary">
-                                Code: {status.currentEvent.code}
-                            </Text>
-                        )}
-                        <Text type="secondary">
-                            Naming: {status?.fileNameMode ?? 'in-season'}
+                        <Text
+                            type="secondary"
+                            className="file-name"
+                            title={status?.sampleFileName || undefined}
+                        >
+                            {status?.sampleFileName
+                                ? `Filename: ${status.sampleFileName}`
+                                : 'Filename: -'}
                         </Text>
-                        <Space size={6}>
-                            <FolderOpenOutlined />
+                        <Space size={6} align="start">
+                            <Button
+                                type="text"
+                                size="small"
+                                icon={<FolderOpenOutlined />}
+                                onClick={() => {
+                                    if (status?.saveFolder) {
+                                        window.electron?.ipcRenderer.sendMessage(
+                                            'autoav:openFolder',
+                                            []
+                                        );
+                                    } else {
+                                        setSettingsOpen(true);
+                                    }
+                                }}
+                                style={{ padding: 0, height: 'auto' }}
+                            />
                             <Text
                                 type="secondary"
                                 className="file-name"
                                 title={status?.saveFolder ?? undefined}
                             >
                                 {status?.saveFolder ??
-                                    'Saved alongside vMix recordings once recording starts'}
+                                    'Set a save folder in Settings, or it appears here after the first recorded match'}
                             </Text>
                         </Space>
                     </Space>
                 </Card>
             </div>
 
-            <Space
-                align="center"
-                style={{
-                    width: '100%',
-                    justifyContent: 'space-between',
-                    margin: '16px 0 8px',
-                }}
-            >
-                <Title level={5} style={{ margin: 0 }}>
-                    Recorded matches ({matches.length})
-                </Title>
-                {matches.length > 0 && (
-                    <Popconfirm
-                        title="Clear recorded match history?"
-                        description="This only clears the list shown here, not the video files."
-                        okText="Clear"
-                        okButtonProps={{ danger: true }}
-                        onConfirm={() =>
-                            window.electron?.ipcRenderer.sendMessage(
-                                'autoav:clearMatches',
-                                []
-                            )
-                        }
-                    >
-                        <Button size="small" danger type="text">
-                            Clear history
-                        </Button>
-                    </Popconfirm>
-                )}
-            </Space>
+            <Title level={5} style={{ margin: '16px 0 8px' }}>
+                Recorded matches ({matches.length})
+            </Title>
 
             {matches.length === 0 ? (
                 <Empty description="No matches recorded yet" />
@@ -324,6 +542,11 @@ export default function AutoAVPage() {
                     dataSource={matches}
                 />
             )}
-        </div>
+            </div>
+            <SettingsDialog
+                open={settingsOpen}
+                onClose={() => setSettingsOpen(false)}
+            />
+        </>
     );
 }

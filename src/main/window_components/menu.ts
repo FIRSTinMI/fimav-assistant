@@ -4,17 +4,13 @@ import {
     shell,
     BrowserWindow,
     MenuItemConstructorOptions,
-    dialog,
 } from 'electron';
 import Addons from 'main/addons';
 import { platform } from 'os';
 import { updateNow } from '../updates/update';
 import { isDebug, logsPath } from '../util';
-import createAlertsWindow, { getAlertsWindow } from './alertsWindow';
 import { quitApp } from '../main'; // eslint-disable-line import/no-cycle
-import VmixService from '../../services/VmixService';
 import AutoAV from '../addons/autoav';
-import { invoke } from './signalR';
 
 interface DarwinMenuItemConstructorOptions extends MenuItemConstructorOptions {
     selector?: string;
@@ -40,8 +36,8 @@ export default class MenuBuilder {
         return menu;
     }
 
+    // eslint-disable-next-line class-methods-use-this
     buildDefaultTemplate(dev: boolean) {
-        const that = this;
         const templateDefault: MenuItemConstructorOptions[] = [];
 
         if (platform() === 'darwin') {
@@ -70,120 +66,14 @@ export default class MenuBuilder {
 
         templateDefault.push(
             ...([
-                {
-                    label: 'Alerts',
-                    submenu: [
-                        {
-                            label: 'View Alerts',
-                            click() {
-                                const alertsWindow = getAlertsWindow();
-                                if (alertsWindow) {
-                                    alertsWindow.show();
-                                } else {
-                                    createAlertsWindow();
-                                }
-                            },
-                        },
-                    ],
-                },
-                {
-                    label: 'Addons',
-                    submenu: [
-                        {
-                            label: 'Live Captions',
-                            submenu: [
-                                {
-                                    label: 'Restart',
-                                    click() {
-                                        that.addons.restartLiveCaptions();
-                                    },
-                                },
-                                {
-                                    label: 'Settings',
-                                    click() {
-                                        MenuBuilder.openLiveCapSettings();
-                                    },
-                                },
-                                {
-                                    label: 'About',
-                                    click() {
-                                        MenuBuilder.openLiveCapSettings(
-                                            'about'
-                                        );
-                                    },
-                                },
-                            ],
-                        },
-                        {
-                            label: 'AutoAV',
-                            submenu: [
-                                {
-                                    label: 'Restart',
-                                    click() {
-                                        that.addons.restartAutoAV();
-                                    },
-                                },
-                            ],
-                        },
-                        {
-                            label: 'Restart All',
-                            click() {
-                                that.addons.restartAll();
-                            },
-                        },
-                    ],
-                },
-                {
-                    label: 'vMix',
-                    submenu: [
-                        {
-                            label: 'Set Stream Keys',
-                            click: async () => {
-                                // Set a timeout for the stream keys, if we don't get a response in 10 seconds, show a message box
-                                const timeout = setTimeout(() => {
-                                    dialog.showMessageBox({
-                                        message:
-                                            'Failed to set stream keys: Timed out',
-                                        title: 'vMix Streaming',
-                                        type: 'info',
-                                    });
-                                }, 10000);
-
-                                VmixService.Instance.events.once(
-                                    'streamInfoUpdated',
-                                    (success: boolean) => {
-                                        // Clear the timeout
-                                        clearTimeout(timeout);
-
-                                        // Show a message
-                                        dialog.showMessageBox({
-                                            message: success
-                                                ? 'Successfully set vMix streaming locations'
-                                                : 'Failed to set streaming locations. Check the log for more details.',
-                                            title: 'vMix Streaming',
-                                            type: 'info',
-                                        });
-                                    }
-                                );
-
-                                // This will trigger SignalR to send us the stream info, which is being listened for in register-events.ts
-                                invoke('GetStreamInfo');
-                            },
-                        },
-                        {
-                            label: 'Add Live Captions input',
-                            click() {
-                                MenuBuilder.addLiveCapInput();
-                            },
-                        },
-                        {
-                            label: 'Add Audience Display (Web) input',
-                            click() {
-                                MenuBuilder.addAudienceDisplayWebInput();
-                            },
-                        },
-                        ...(dev
-                            ? ([
+                // Alerts now live in the tab-bar notification bell.
+                // vMix controls now live in the vMix tab. Only the dev-only
+                // manual recording triggers remain, behind the dev flag.
+                ...(dev
+                    ? ([
+                          {
+                              label: 'vMix (Dev)',
+                              submenu: [
                                   {
                                       label: 'Start Recording (Dev)',
                                       click() {
@@ -196,10 +86,10 @@ export default class MenuBuilder {
                                           AutoAV.Instance.devStopRecording();
                                       },
                                   },
-                              ] as MenuItemConstructorOptions[])
-                            : []),
-                    ],
-                },
+                              ],
+                          },
+                      ] as MenuItemConstructorOptions[])
+                    : []),
                 {
                     label: 'About',
                     submenu: [
@@ -280,82 +170,4 @@ export default class MenuBuilder {
         window.show();
     }
 
-    static async addLiveCapInput() {
-        try {
-            // Add input to vMix
-            await VmixService.Instance.AddBrowserInput(
-                'http://127.0.0.1:3000/'
-            );
-
-            // Get inputs
-            const parsed = await VmixService.Instance.GetBase();
-
-            // Find the input we just added
-            let found = false;
-            parsed.vmix.inputs.input.forEach(async (input: any) => {
-                if (
-                    !found &&
-                    input.type === 'Browser' &&
-                    input.title === 'Browser 127.0.0.1'
-                ) {
-                    // Rename it
-                    await VmixService.Instance.RenameInput(
-                        input.key,
-                        'Live Captions'
-                    );
-                    found = true;
-                }
-            });
-        } catch (err) {
-            // Sadness
-            dialog.showErrorBox('Failed', 'Unable to communicate with vMix');
-        }
-    }
-
-    static async addAudienceDisplayWebInput() {
-        try {
-            // Add input to vMix
-            await VmixService.Instance.AddBrowserInput(
-                'http://10.0.100.5/AudienceDisplay'
-            );
-
-            // Get inputs
-            const parsed = await VmixService.Instance.GetBase();
-
-            // Find the input we just added
-            let found = false;
-            parsed.vmix.inputs.input.forEach(async (input: any) => {
-                if (
-                    !found &&
-                    input.type === 'Browser' &&
-                    input.title === 'Browser 10.0.100.5'
-                ) {
-                    // Rename it
-                    await VmixService.Instance.RenameInput(
-                        input.key,
-                        'Audience Display'
-                    );
-                    await VmixService.Instance.SetInputAudioAlwaysOn(input.key);
-
-                    // const result = await dialog.showMessageBox({
-                    //     title: 'Additional Action Required',
-                    //     message:
-                    //         'Input created. Click "copy" to copy necessary CSS, then right click the input, go to properties, and paste.',
-                    //     type: 'info',
-                    //     buttons: ['Copy', 'Skip'],
-                    //     defaultId: 0,
-                    // });
-
-                    // if (result.response === 0) {
-                    //     clipboard.writeText('body {background: transparent;}');
-                    // }
-
-                    found = true;
-                }
-            });
-        } catch (err) {
-            // Sadness
-            dialog.showErrorBox('Failed', 'Unable to communicate with vMix');
-        }
-    }
 }

@@ -6,6 +6,8 @@ import Alerts from './pages/alerts';
 import CameraSetup from './pages/camera_setup';
 import FallbackToDocs from './pages/fallbackToDocs';
 import AutoAV from './pages/autoav';
+import LiveCaptions from './pages/livecaptions';
+import Vmix from './pages/vmix';
 
 // Always use the hash router (both dev and prod load from a file/hash URL)
 export const AppRouter = HashRouter;
@@ -16,6 +18,8 @@ function AppRoutes() {
             <Route path="/" element={<Welcome />} />
             <Route path="/alerts" element={<Alerts />} />
             <Route path="/autoav" element={<AutoAV />} />
+            <Route path="/vmix" element={<Vmix />} />
+            <Route path="/livecaptions" element={<LiveCaptions />} />
 
             {/* Each Step should be defined here, and each step handles itself. Use this to rearrange steps */}
             <Route
