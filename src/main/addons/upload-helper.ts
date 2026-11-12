@@ -8,11 +8,11 @@ import AddonEvents from './addon-events';
 import { getStore } from '../store';
 import AutoAV from './autoav';
 import FtcScorekeeper from '../ftc/scorekeeper';
+import SerialQueue from '../serial-queue';
+import killByNameAndPort from './kill-process';
 import {
-    SerialQueue,
     compareVersions,
     downloadRelease,
-    killByNameAndPort,
     latestReleaseVersion,
     newestLocalVersion,
 } from './release-download';

@@ -6,11 +6,11 @@ import { AddonLoggers } from './addon-loggers';
 import AddonPhaseTracker from './addon-phase';
 import AddonEvents from './addon-events';
 import { getStore } from '../store';
+import SerialQueue from '../serial-queue';
+import killByNameAndPort from './kill-process';
 import {
-    SerialQueue,
     compareVersions,
     downloadRelease,
-    killByNameAndPort,
     latestReleaseVersion,
     newestLocalVersion,
 } from './release-download';
