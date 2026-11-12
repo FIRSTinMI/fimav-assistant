@@ -108,6 +108,7 @@ export default class AutoAV {
         fileNameMode: 'in-season',
         fileNameModeForced: false,
         season: 'in-season',
+        uploader: false,
         ftcConnected: false,
         program: 'frc',
         programDetected: null,
@@ -1038,14 +1039,19 @@ export default class AutoAV {
         );
     }
 
-    // The YouTube uploader runs at FTC events in either season and at FRC
-    // off-season events.
+    // The YouTube uploader runs at FRC off-season events when match video
+    // upload is on in Settings (off by default). Never at FTC events this
+    // season.
     public runsUploader(): boolean {
-        return this.isFtc() || this.isOffSeason();
+        return (
+            this.isFrcOffSeason() &&
+            getStore().get('matchVideoUpload', false) === true
+        );
     }
 
     // Off-season turns on the off-season-only features: the YouTube uploader
-    // and Upload tab, the custom audience display and dead-time cutting.
+    // and Upload tab (when opted in), the custom audience display and
+    // dead-time cutting.
     // Detected, never set: an unofficial event is off-season, an official one
     // in-season. With no event, January to April is in-season and the rest of
     // the year off-season. File naming is separate and does not decide it.
@@ -1091,6 +1097,7 @@ export default class AutoAV {
             : null;
         this.status.fileNameMode = this.effectiveFileNameMode();
         this.status.season = this.isOffSeason() ? 'off-season' : 'in-season';
+        this.status.uploader = this.runsUploader();
         this.status.frcAudienceDisplay =
             store.get('frcAudienceDisplay', 'fms') === 'customAd'
                 ? 'customAd'

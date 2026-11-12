@@ -1009,12 +1009,23 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         }
     };
 
+    // A started uploader, or one moved to a new folder or program, has only
+    // its built-in templates and no credentials: send this app's settings,
+    // keeping the playlist it has for the event. A switch that carries a
+    // playlist (pendingPlaylist) pushes it itself.
+    YoutubeUploaderAddon.Instance.events.on('target', async () => {
+        if (pendingPlaylist) return;
+        const playlist = await readUploaderPlaylist();
+        if (pendingPlaylist) return;
+        pushUploadConfig(playlist);
+    });
+
     // The uploader and the custom audience display follow the program and
-    // the season: the uploader runs at FTC events and FRC off-season events,
-    // the custom display only at FRC off-season events. When what an addon
-    // should be doing changes, it is started or stopped. At boot the mode is
-    // the stored fallback until FMS or the scorekeeper reports, so that change
-    // is what starts them.
+    // the season: both run only at FRC off-season events, the uploader when
+    // match video upload is on in Settings, the custom display when Settings
+    // picks it. When what an addon should be doing changes, it is started or
+    // stopped. At boot the mode is the stored fallback until FMS or the
+    // scorekeeper reports, so that change is what starts them.
     // The uploader value carries the program, the folder and the event key: a
     // change is a live switch (POST /api/control/event) on the running
     // uploader. A key alone changing (same folder) waits out a running upload.
@@ -1119,12 +1130,13 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         ).catch(() => undefined);
     }, 15000);
 
-    // Global Settings (menu bar): FRC/FTC override and the FRC off-season
-    // audience display. The FTC scorekeeper address lives on the ftc:*
-    // channels.
+    // Global Settings (menu bar): FRC/FTC override, the FRC off-season
+    // audience display and FRC off-season match video upload. The FTC
+    // scorekeeper address lives on the ftc:* channels.
     const appSettings = () => ({
         program: store.get('program', 'auto'),
         frcAudienceDisplay: store.get('frcAudienceDisplay', 'fms'),
+        matchVideoUpload: store.get('matchVideoUpload', false),
         companionPort: store.get('companionPort', 8888),
     });
 
@@ -1159,6 +1171,9 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         if (['fms', 'customAd'].includes(s?.frcAudienceDisplay)) {
             store.set('frcAudienceDisplay', s.frcAudienceDisplay);
         }
+        if (typeof s?.matchVideoUpload === 'boolean') {
+            store.set('matchVideoUpload', s.matchVideoUpload);
+        }
         const port = Number(s?.companionPort);
         if (
             Number.isInteger(port) &&
@@ -1170,7 +1185,8 @@ export default function registerAllEvents(window: BrowserWindow | null) {
             store.set('companionPort', port);
             pointCustomAdAtCompanion(oldUrl);
         }
-        // Re-emits status, which starts or stops the custom display.
+        // Re-emits status, which starts or stops the custom display and the
+        // uploader.
         AutoAV.Instance.applySettings();
         event.reply('app:settings', appSettings());
     });

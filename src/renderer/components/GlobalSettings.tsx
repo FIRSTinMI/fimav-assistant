@@ -6,6 +6,7 @@ import {
     Modal,
     Select,
     Space,
+    Switch,
     Typography,
     message,
 } from 'antd';
@@ -22,7 +23,9 @@ const send = (channel: string, ...args: unknown[]) =>
 
 // App-wide settings, opened from "Settings" in the menu bar: FRC / FTC
 // (detected, with an override), the FRC off-season audience display (reset
-// to FMS at each new event) and the FTC Live scorekeeper. FTC recording
+// to FMS at each new event), FRC off-season match video upload (off by
+// default; turns on the uploader and the Upload tab) and the FTC Live
+// scorekeeper. FTC recording
 // length lives in Auto AV's settings.
 export default function GlobalSettings() {
     const [open, setOpen] = useState(false);
@@ -30,6 +33,7 @@ export default function GlobalSettings() {
     const [detected, setDetected] =
         useState<AutoAVStatus['programDetected']>(null);
     const [frcAd, setFrcAd] = useState<'fms' | 'customAd'>('fms');
+    const [matchVideoUpload, setMatchVideoUpload] = useState(false);
     const [offSeason, setOffSeason] = useState(false);
     const [address, setAddress] = useState('');
     const [ftcStatus, setFtcStatus] = useState<FtcScorekeeperStatus | null>(
@@ -55,9 +59,11 @@ export default function GlobalSettings() {
                 (s: {
                     program: ProgramSetting;
                     frcAudienceDisplay: 'fms' | 'customAd';
+                    matchVideoUpload: boolean;
                 }) => {
                     setProgram(s.program);
                     setFrcAd(s.frcAudienceDisplay);
+                    setMatchVideoUpload(s.matchVideoUpload);
                 }
             ),
             ipcRenderer.on('ftc:settings', (s: FtcSettings) => {
@@ -97,6 +103,7 @@ export default function GlobalSettings() {
         send('app:saveSettings', {
             program,
             frcAudienceDisplay: frcAd,
+            matchVideoUpload,
         });
         if (program !== 'frc') {
             send('ftc:saveSettings', { address });
@@ -147,6 +154,14 @@ export default function GlobalSettings() {
                                     label: 'Custom AD (off-season)',
                                 },
                             ]}
+                        />
+                    </Form.Item>
+                )}
+                {effective !== 'ftc' && offSeason && (
+                    <Form.Item label="Match video upload">
+                        <Switch
+                            checked={matchVideoUpload}
+                            onChange={setMatchVideoUpload}
                         />
                     </Form.Item>
                 )}
