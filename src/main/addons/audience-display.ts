@@ -10,10 +10,9 @@ import AutoAV from './autoav';
 import SerialQueue from '../serial-queue';
 import killByNameAndPort from './kill-process';
 import {
-    compareVersions,
+    UpdateInfo,
+    checkForUpdate,
     downloadRelease,
-    latestReleaseVersion,
-    newestLocalVersion,
 } from './release-download';
 
 // AudienceDisplayAddon spawns and supervises the custom audience display
@@ -98,13 +97,6 @@ export default class AudienceDisplayAddon {
         return false;
     }
 
-    // Newest exe already downloaded, named audience-display-<version>.exe in
-    // the app's userData dir.
-    // eslint-disable-next-line class-methods-use-this
-    private localVersion(): string {
-        return newestLocalVersion('audience-display');
-    }
-
     // start() and stop() run one at a time (see SerialQueue).
     public start(): Promise<boolean> {
         this.phase.set('starting');
@@ -126,33 +118,29 @@ export default class AudienceDisplayAddon {
             return false;
         }
 
-        let currentVersion = this.localVersion();
-
         // Update check + download is best-effort: offline at a venue we fall
         // back to the newest local exe rather than leaving the display down.
         this.phase.set('updating');
-        try {
-            const baseUrl = getStore().get('audienceDisplayDownloadBase');
-            const latestVersion = await latestReleaseVersion(baseUrl);
-            if (
-                latestVersion &&
-                compareVersions(latestVersion, currentVersion) > 0
-            ) {
-                this.logs.out.log(
-                    `New audience display available, currently ${currentVersion}, downloading ${latestVersion}`
-                );
+        const baseUrl = getStore().get('audienceDisplayDownloadBase');
+        const update = await this.checkForUpdate();
+        let currentVersion = update.current;
+        if (update.updateAvailable) {
+            this.logs.out.log(
+                `New audience display available, currently ${currentVersion}, downloading ${update.latest}`
+            );
+            try {
                 await downloadRelease(
                     baseUrl,
                     'audience-display',
-                    latestVersion
+                    update.latest
                 );
-                currentVersion = latestVersion;
+                currentVersion = update.latest;
+            } catch (e) {
+                this.logs.err.warn(
+                    `Update download failed, using local v${currentVersion}`,
+                    e
+                );
             }
-        } catch (e) {
-            this.logs.err.warn(
-                `Update check failed, using local v${currentVersion}`,
-                e
-            );
         }
 
         if (currentVersion === '0.0.0') {
@@ -260,24 +248,12 @@ export default class AudienceDisplayAddon {
     }
 
     // Check GitHub for a newer audience display without downloading it.
-    public async checkForUpdate(): Promise<{
-        current: string;
-        latest: string;
-        updateAvailable: boolean;
-    }> {
-        const current = this.localVersion();
-        let latest = current;
-        try {
-            const baseUrl = getStore().get('audienceDisplayDownloadBase');
-            latest = (await latestReleaseVersion(baseUrl)) ?? current;
-        } catch (e) {
-            this.logs.err.warn('Update check failed', e);
-        }
-        return {
-            current,
-            latest,
-            updateAvailable: compareVersions(latest, current) > 0,
-        };
+    public checkForUpdate(): Promise<UpdateInfo> {
+        return checkForUpdate(
+            'audience-display',
+            getStore().get('audienceDisplayDownloadBase'),
+            this.logs.err
+        );
     }
 
     public static get Instance(): AudienceDisplayAddon {

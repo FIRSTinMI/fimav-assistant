@@ -3,6 +3,7 @@ import fs from 'fs';
 import { finished } from 'stream/promises';
 import { Readable } from 'node:stream';
 import glob from 'glob';
+import { LogFunctions } from 'electron-log';
 import { appdataPath } from '../util';
 
 // Shared plumbing for the addons that run a versioned Windows exe downloaded
@@ -50,6 +51,35 @@ export async function latestReleaseVersion(
     const tag = res.url.split('/').pop() ?? '';
     const m = /^v(\d+\.\d+\.\d+)$/.exec(tag);
     return m ? m[1] : null;
+}
+
+export interface UpdateInfo {
+    current: string;
+    latest: string;
+    updateAvailable: boolean;
+}
+
+// Compare the newest downloaded <name> exe with the newest release, without
+// downloading anything. Best-effort: offline at a venue, or when the release
+// tag is not a clean version, latest is the local version and no update is
+// reported.
+export async function checkForUpdate(
+    name: string,
+    baseUrl: string,
+    logger: LogFunctions
+): Promise<UpdateInfo> {
+    const current = newestLocalVersion(name);
+    let latest = current;
+    try {
+        latest = (await latestReleaseVersion(baseUrl)) ?? current;
+    } catch (e) {
+        logger.warn(`Update check failed, using local v${current}`, e);
+    }
+    return {
+        current,
+        latest,
+        updateAvailable: compareVersions(latest, current) > 0,
+    };
 }
 
 // Download <baseUrl>/download/v<version>/<name>-<version>.exe into userData.
