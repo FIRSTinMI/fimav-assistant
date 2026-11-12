@@ -1551,7 +1551,7 @@ export default class Checks extends EventEmitter {
         else this.set('captions', 'ok', `On overlay ${CAPTIONS_OVERLAY}`);
     }
 
-    // The YouTube match-video uploader (FRC off-season, opted in): up,
+    // The YouTube match-video uploader (off-season events): up,
     // signed in, no failed uploads, no quota error. Sign-in and the queue
     // come from its event stream.
     private checkUploader() {

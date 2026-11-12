@@ -48,10 +48,6 @@ export type AppConfig = {
     };
     // FRC / FTC override from Settings; 'auto' follows detection.
     program: 'auto' | 'frc' | 'ftc';
-    // FRC off-season: upload match videos to YouTube (Settings, off by
-    // default). Off means the uploader never runs and the Upload tab is
-    // hidden.
-    matchVideoUpload: boolean;
     // FRC off-season: which audience display is used, the official FMS one
     // or our custom one (Settings; back to 'fms' on every new event). It
     // decides whether the custom display runs, which display the vMix input
@@ -220,7 +216,6 @@ export function createStore(): Store<AppConfig> {
                 },
             },
             program: { type: 'string', default: 'auto' },
-            matchVideoUpload: { type: 'boolean', default: false },
             frcAudienceDisplay: { type: 'string', default: 'fms' },
             companionPort: { type: 'number', default: 8888 },
             checks: {

@@ -823,23 +823,18 @@ test('an error after the match is filed keeps its good record (it still uploads)
     expect(fs.existsSync(rec.filePath as string)).toBe(true);
 });
 
-// Match video upload is opt-in and FRC off-season only.
-describe('uploader opt-in', () => {
+// The uploader runs at off-season events only, FRC or FTC.
+describe('uploader at off-season events', () => {
     test.each([
-        ['frc', true, true, true],
-        ['frc', true, false, false],
-        ['frc', false, true, false],
-        ['ftc', true, true, false],
-        ['ftc', false, true, false],
-    ])(
-        '%s off-season=%s opted-in=%s: runs=%s',
-        (program, off, optIn, runs) => {
-            offSeason = off as boolean;
-            cfg.program = program;
-            if (optIn) cfg.matchVideoUpload = true;
-            const { a } = newAutoAV();
-            expect(a.runsUploader()).toBe(runs);
-            expect(a.getStatus().uploader).toBe(runs);
-        }
-    );
+        ['frc', true, true],
+        ['frc', false, false],
+        ['ftc', true, true],
+        ['ftc', false, false],
+    ])('%s off-season=%s: runs=%s', (program, off, runs) => {
+        offSeason = off as boolean;
+        cfg.program = program;
+        const { a } = newAutoAV();
+        expect(a.runsUploader()).toBe(runs);
+        expect(a.getStatus().uploader).toBe(runs);
+    });
 });

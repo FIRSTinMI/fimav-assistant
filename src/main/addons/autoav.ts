@@ -1039,18 +1039,14 @@ export default class AutoAV {
         );
     }
 
-    // The YouTube uploader runs at FRC off-season events when match video
-    // upload is on in Settings (off by default). Never at FTC events this
-    // season.
+    // The YouTube uploader runs at off-season events only, FRC or FTC. Never
+    // at in-season events.
     public runsUploader(): boolean {
-        return (
-            this.isFrcOffSeason() &&
-            getStore().get('matchVideoUpload', false) === true
-        );
+        return this.isOffSeason();
     }
 
     // Off-season turns on the off-season-only features: the YouTube uploader
-    // and Upload tab (when opted in), the custom audience display and
+    // and Upload tab, the custom audience display and
     // dead-time cutting.
     // Detected, never set: an unofficial event is off-season, an official one
     // in-season. With no event, January to April is in-season and the rest of

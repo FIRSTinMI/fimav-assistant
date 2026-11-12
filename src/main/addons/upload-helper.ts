@@ -143,7 +143,7 @@ export default class YoutubeUploaderAddon {
 
         // Match-video uploads: FRC off-season, when turned on in Settings.
         if (!AutoAV.Instance.runsUploader()) {
-            this.logs.out.log('Match video upload not in use; uploader off');
+            this.logs.out.log('Not an off-season event; uploader off');
             this.running = false;
             return false;
         }

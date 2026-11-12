@@ -60,7 +60,7 @@ const tabs: TabDef[] = [
         label: 'Upload',
         icon: <YoutubeFilled />,
         isActive: (p) => p.startsWith('/upload'),
-        // FRC off-season with match video upload on in Settings.
+        // Off-season events only, FRC or FTC.
         showIf: (s) => s.uploader,
     },
     {

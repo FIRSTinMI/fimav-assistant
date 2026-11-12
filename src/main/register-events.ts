@@ -1136,7 +1136,6 @@ export default function registerAllEvents(window: BrowserWindow | null) {
     const appSettings = () => ({
         program: store.get('program', 'auto'),
         frcAudienceDisplay: store.get('frcAudienceDisplay', 'fms'),
-        matchVideoUpload: store.get('matchVideoUpload', false),
         companionPort: store.get('companionPort', 8888),
     });
 
@@ -1170,9 +1169,6 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         }
         if (['fms', 'customAd'].includes(s?.frcAudienceDisplay)) {
             store.set('frcAudienceDisplay', s.frcAudienceDisplay);
-        }
-        if (typeof s?.matchVideoUpload === 'boolean') {
-            store.set('matchVideoUpload', s.matchVideoUpload);
         }
         const port = Number(s?.companionPort);
         if (

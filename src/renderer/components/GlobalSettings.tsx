@@ -6,7 +6,6 @@ import {
     Modal,
     Select,
     Space,
-    Switch,
     Typography,
     message,
 } from 'antd';
@@ -33,7 +32,6 @@ export default function GlobalSettings() {
     const [detected, setDetected] =
         useState<AutoAVStatus['programDetected']>(null);
     const [frcAd, setFrcAd] = useState<'fms' | 'customAd'>('fms');
-    const [matchVideoUpload, setMatchVideoUpload] = useState(false);
     const [offSeason, setOffSeason] = useState(false);
     const [address, setAddress] = useState('');
     const [ftcStatus, setFtcStatus] = useState<FtcScorekeeperStatus | null>(
@@ -59,11 +57,9 @@ export default function GlobalSettings() {
                 (s: {
                     program: ProgramSetting;
                     frcAudienceDisplay: 'fms' | 'customAd';
-                    matchVideoUpload: boolean;
                 }) => {
                     setProgram(s.program);
                     setFrcAd(s.frcAudienceDisplay);
-                    setMatchVideoUpload(s.matchVideoUpload);
                 }
             ),
             ipcRenderer.on('ftc:settings', (s: FtcSettings) => {
@@ -103,7 +99,6 @@ export default function GlobalSettings() {
         send('app:saveSettings', {
             program,
             frcAudienceDisplay: frcAd,
-            matchVideoUpload,
         });
         if (program !== 'frc') {
             send('ftc:saveSettings', { address });
@@ -154,14 +149,6 @@ export default function GlobalSettings() {
                                     label: 'Custom AD (off-season)',
                                 },
                             ]}
-                        />
-                    </Form.Item>
-                )}
-                {effective !== 'ftc' && offSeason && (
-                    <Form.Item label="Match video upload">
-                        <Switch
-                            checked={matchVideoUpload}
-                            onChange={setMatchVideoUpload}
                         />
                     </Form.Item>
                 )}
