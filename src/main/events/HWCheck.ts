@@ -9,7 +9,7 @@ import { networkInterfaces, hostname, NetworkInterfaceInfo } from 'os';
 import path from 'path';
 import ping from 'ping';
 import { elevatedPSCommand, psCommand } from '../util';
-import HWPing from '../addons/hw-ping';
+import HWPing, { probeSwitch } from '../addons/hw-ping';
 
 const SoundVolumeViewPath =
     process.env.NODE_ENV === 'production'
@@ -204,12 +204,10 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     if (resp.av_ip_ready) {
         // Ping on-cart devices
         const promises = [
-            // Cart addressing (checked on FIMVIDEO3's vMix PTZ inputs):
-            // switch .10N, PTZ1 .N1, PTZ2 .N2, mixer .N3. docs.fimav.us lists
-            // the switch at .N9, but the switches are really at .10N. Only
-            // carts 1-9 exist, so .10N never goes out of range.
+            // Cart addressing: switch .N9 (falling back to .10N), PTZ1 .N1,
+            // PTZ2 .N2, mixer .N3.
             // Ping switch
-            ping.promise.probe(`192.168.25.10${cartNumber}`, pingConfig),
+            probeSwitch(cartNumber),
             // Ping mixer
             ping.promise.probe(`192.168.25.${cartNumber}3`, pingConfig),
             // Ping PTZ1

@@ -1,5 +1,7 @@
 import zlib from 'zlib';
-import WebSocket from 'ws';
+import { CompanionOps, DownAction, openOps } from './companion/adapters';
+import { CompanionInfo, detectCompanion } from './companion/detect';
+import { isUntested, parseVersion } from './companion/version';
 import {
     CompanionAction,
     CompanionButton,
@@ -12,17 +14,25 @@ import {
 } from '../models/Bitfocus';
 import { getStore } from './store';
 
+// A version string that parses and is newer than the newest one tested.
+function isUntestedRaw(raw: string): boolean {
+    const v = parseVersion(raw);
+    return !!v && isUntested(v);
+}
+
 // Bitfocus Companion + audience-display trigger access for the Bitfocus tab.
 //
 // Reading: Companion's full config export (GET /int/export/full, gzipped JSON)
 // gives every page, button and connection in one request.
 //
 // Writing: Companion has no public API for editing buttons. Its own web UI
-// edits over tRPC on ws://<host>/trpc, and this uses the same calls
-// (controls.resetControl, controls.entities.add/setOption/remove,
-// controls.styles.updateOption), verified against Companion 5.0. It runs here
-// in the main process because Companion refuses a WebSocket whose browser
-// Origin does not match its own host, and a Node client sends no Origin.
+// edits over tRPC on ws://<host>/trpc, and this uses the same calls. The tab
+// supports Companion 5.0 and 5.1: companion/ holds an adapter for each,
+// picked by the running version and confirmed by a probe. Older versions, or
+// a newer one neither probe passes, are shown read only. This runs in the
+// main process because
+// Companion 5.x refuses a WebSocket whose browser Origin does not match its
+// own host, and a Node client sends no Origin.
 
 const FMS_URL = 'http://10.0.100.5';
 
@@ -68,21 +78,11 @@ function buttonActions(ctl: any): CompanionAction[] {
     }));
 }
 
-export async function readCompanionLayout(
-    baseUrl: string
-): Promise<CompanionLayout> {
-    const res = await fetch(`${baseUrl}/int/export/full`, {
-        signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) throw new Error(`Companion export: HTTP ${res.status}`);
-    const raw = Buffer.from(await res.arrayBuffer());
-    const json = JSON.parse(
-        (raw[0] === 0x1f && raw[1] === 0x8b
-            ? zlib.gunzipSync(raw)
-            : raw
-        ).toString('utf8')
-    );
-
+// The export's layout, for 5.x and, read only, for older Companions whose
+// export has the same per-page shape.
+export function parseCompanionExport(
+    json: any
+): Omit<CompanionLayout, 'version' | 'editable' | 'untested'> {
     const pages: CompanionPage[] = Object.entries(json.pages ?? {})
         .map(([num, p]: [string, any]) => {
             const buttons: Record<string, CompanionButton> = {};
@@ -120,106 +120,24 @@ export async function readCompanionLayout(
     return { pages, connections };
 }
 
-// #endregion
-
-// #region Companion write (tRPC over WebSocket)
-
-class TrpcSession {
-    private ws: WebSocket;
-
-    private nextId = 0;
-
-    private waiting = new Map<number, (_m: any) => void>();
-
-    private constructor(ws: WebSocket) {
-        this.ws = ws;
-        ws.on('message', (data) => {
-            let m: any;
-            try {
-                m = JSON.parse(String(data));
-            } catch {
-                return; // not a tRPC frame
-            }
-            const cb = this.waiting.get(m?.id);
-            if (!cb) return;
-            // A subscription answers "started" before its first data.
-            if (m.result?.type === 'started') return;
-            this.waiting.delete(m.id);
-            cb(m);
-        });
-    }
-
-    static open(baseUrl: string): Promise<TrpcSession> {
-        const url = `${baseUrl.replace(/^http/, 'ws')}/trpc`;
-        return new Promise((resolve, reject) => {
-            const ws = new WebSocket(url);
-            const timer = setTimeout(() => {
-                ws.terminate();
-                reject(new Error('Companion did not answer'));
-            }, 8000);
-            ws.once('open', () => {
-                clearTimeout(timer);
-                resolve(new TrpcSession(ws));
-            });
-            ws.once('error', (e) => {
-                clearTimeout(timer);
-                reject(e);
-            });
-        });
-    }
-
-    private send(method: string, path: string, input: unknown): Promise<any> {
-        this.nextId += 1;
-        const id = this.nextId;
-        return new Promise((resolve, reject) => {
-            const timer = setTimeout(() => {
-                this.waiting.delete(id);
-                reject(new Error(`Companion: ${path} timed out`));
-            }, 8000);
-            this.waiting.set(id, (m) => {
-                clearTimeout(timer);
-                if (m.error) {
-                    reject(
-                        new Error(
-                            `Companion: ${path}: ${
-                                m.error.message ?? JSON.stringify(m.error)
-                            }`
-                        )
-                    );
-                } else {
-                    resolve(m.result?.data);
-                }
-            });
-            this.ws.send(
-                JSON.stringify({ id, method, params: { path, input } })
-            );
-            if (method === 'subscription') {
-                // Only the first value is wanted; stop once it arrives.
-                const stop = this.waiting.get(id)!;
-                this.waiting.set(id, (m) => {
-                    this.ws.send(
-                        JSON.stringify({ id, method: 'subscription.stop' })
-                    );
-                    stop(m);
-                });
-            }
-        });
-    }
-
-    mutate(path: string, input: unknown) {
-        return this.send('mutation', path, input);
-    }
-
-    first(path: string, input: unknown) {
-        return this.send('subscription', path, input);
-    }
-
-    close() {
-        this.ws.close();
-    }
+export async function readCompanionExport(baseUrl: string): Promise<any> {
+    const res = await fetch(`${baseUrl}/int/export/full`, {
+        signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) throw new Error(`Companion export: HTTP ${res.status}`);
+    // Gzipped without a Content-Encoding header, so it arrives compressed.
+    const raw = Buffer.from(await res.arrayBuffer());
+    return JSON.parse(
+        (raw[0] === 0x1f && raw[1] === 0x8b
+            ? zlib.gunzipSync(raw)
+            : raw
+        ).toString('utf8')
+    );
 }
 
-const value = (v: unknown) => ({ isExpression: false, value: v });
+// #endregion
+
+// #region Companion write
 
 export interface ButtonEdit {
     page: number;
@@ -234,160 +152,161 @@ export interface ButtonEdit {
     }[];
 }
 
-async function controlIdAt(
-    s: TrpcSession,
-    page: number,
-    row: number,
-    column: number
-): Promise<string | null> {
-    const pages = await s.first('pages.watch', undefined);
-    const pageId = pages?.order?.[page - 1];
-    return pages?.pages?.[pageId]?.controls?.[row]?.[column] ?? null;
-}
-
-const DOWN = { stepId: '0', setId: 'down' };
-
 // Write one button: create it if the cell is empty, set its label, and replace
 // its press actions with the given list. Only buttons whose actions are all in
 // the catalog are edited this way (the tab checks), so replacing the list
 // cannot drop an action the editor does not show.
-export async function saveCompanionButton(
-    baseUrl: string,
+export async function saveButtonWith(
+    ops: CompanionOps,
     edit: ButtonEdit
 ): Promise<void> {
-    const s = await TrpcSession.open(baseUrl);
-    try {
-        const location = {
-            pageNumber: edit.page,
-            row: edit.row,
-            column: edit.column,
-        };
-        let controlId = await controlIdAt(s, edit.page, edit.row, edit.column);
-        if (!controlId) {
-            await s.mutate('controls.resetControl', {
-                location,
-                newType: 'button-layered',
-            });
-            controlId = await controlIdAt(s, edit.page, edit.row, edit.column);
-            if (!controlId)
-                throw new Error('Companion did not create the button');
-        }
+    let controlId = await ops.controlIdAt(edit.page, edit.row, edit.column);
+    if (!controlId) {
+        await ops.createButton(edit.page, edit.row, edit.column);
+        controlId = await ops.controlIdAt(edit.page, edit.row, edit.column);
+        if (!controlId) throw new Error('Companion did not create the button');
+    }
 
-        const init = await s.first('controls.watchControl', { controlId });
-        const config = init?.config;
-        if (config?.type !== 'button-layered') {
-            throw new Error('Not an editable button');
-        }
-        const current: any[] = config.steps?.['0']?.action_sets?.down ?? [];
-        const editable = (a: any) =>
-            !Object.values(a.options ?? {}).some(
-                (v: any) => v?.isExpression === true
-            ) &&
-            matchActionDef(
-                a.definitionId,
-                Object.fromEntries(
-                    Object.entries(a.options ?? {}).map(([k, v]) => [
-                        k,
-                        plain(v),
-                    ])
-                )
-            );
-        if (current.some((a) => !editable(a))) {
-            throw new Error('Button has actions only Companion can edit');
-        }
-
-        const textLayer = (config.style?.layers ?? []).find(
-            (l: any) => l?.type === 'text'
+    const config = await ops.readButton(controlId);
+    if (config?.type !== 'button-layered') {
+        throw new Error('Not an editable button');
+    }
+    const current = config.actions;
+    const editable = (a: DownAction) =>
+        !Object.values(a.options).some((v: any) => v?.isExpression === true) &&
+        matchActionDef(
+            a.definitionId,
+            Object.fromEntries(
+                Object.entries(a.options).map(([k, v]) => [k, plain(v)])
+            )
         );
-        if (textLayer) {
-            await s.mutate('controls.styles.updateOption', {
-                controlId,
-                elementId: textLayer.id,
-                key: 'text',
-                value: value(edit.text),
-            });
-        }
+    if (current.some((a) => !editable(a))) {
+        throw new Error('Button has actions only Companion can edit');
+    }
 
-        // Replace the press actions. The new list is added first (add
-        // appends, so order is kept) and the old ones are removed only once
-        // every new action and option is in. If anything fails while adding,
-        // the actions added so far are removed again, so a failed save leaves
-        // the button with its old actions rather than none.
-        const added: string[] = [];
-        try {
-            // eslint-disable-next-line no-restricted-syntax
-            for (const a of edit.actions) {
-                // eslint-disable-next-line no-await-in-loop
-                const entityId = await s.mutate('controls.entities.add', {
-                    controlId,
-                    entityLocation: DOWN,
-                    ownerId: null,
-                    connectionId: a.connectionId,
-                    entityType: 'action',
-                    entityDefinition: a.definitionId,
-                });
-                if (!entityId) {
-                    throw new Error(
-                        `Companion refused action ${a.definitionId}`
-                    );
-                }
-                added.push(entityId);
-                // eslint-disable-next-line no-restricted-syntax
-                for (const [key, v] of Object.entries(a.options)) {
-                    // eslint-disable-next-line no-await-in-loop
-                    await s.mutate('controls.entities.setOption', {
-                        controlId,
-                        entityLocation: DOWN,
-                        entityId,
-                        key,
-                        value: value(v),
-                    });
-                }
-            }
-        } catch (e) {
-            // eslint-disable-next-line no-restricted-syntax
-            for (const entityId of added) {
-                try {
-                    // eslint-disable-next-line no-await-in-loop
-                    await s.mutate('controls.entities.remove', {
-                        controlId,
-                        entityLocation: DOWN,
-                        entityId,
-                    });
-                } catch {
-                    // best effort; the original error is what is reported
-                }
-            }
-            throw e;
-        }
+    await ops.setText(controlId, config, edit.text);
+
+    // Replace the press actions. The new list is added first (add appends,
+    // so order is kept) and the old ones are removed only once every new
+    // action and option is in. If anything fails while adding, the actions
+    // added so far are removed again, so a failed save leaves the button with
+    // its old actions rather than none.
+    const added: string[] = [];
+    try {
         // eslint-disable-next-line no-restricted-syntax
-        for (const a of current) {
+        for (const a of edit.actions) {
             // eslint-disable-next-line no-await-in-loop
-            await s.mutate('controls.entities.remove', {
+            const actionId = await ops.addAction(
                 controlId,
-                entityLocation: DOWN,
-                entityId: a.id,
-            });
+                a.connectionId,
+                a.definitionId
+            );
+            added.push(actionId);
+            // eslint-disable-next-line no-restricted-syntax
+            for (const [key, v] of Object.entries(a.options)) {
+                // eslint-disable-next-line no-await-in-loop
+                await ops.setOption(controlId, actionId, key, v);
+            }
         }
-    } finally {
-        s.close();
+    } catch (e) {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const actionId of added) {
+            try {
+                // eslint-disable-next-line no-await-in-loop
+                await ops.removeAction(controlId, actionId);
+            } catch {
+                // best effort; the original error is what is reported
+            }
+        }
+        throw e;
+    }
+    // eslint-disable-next-line no-restricted-syntax
+    for (const a of current) {
+        // eslint-disable-next-line no-await-in-loop
+        await ops.removeAction(controlId, a.id);
     }
 }
 
-export async function clearCompanionButton(
+// The adapter for the Companion at baseUrl, found once per Companion build:
+// the layout poll every few seconds re-reads the export, which carries the
+// build, so detection runs again only when the build changes or a call fails.
+let known: { baseUrl: string; build: string; info: CompanionInfo } | null =
+    null;
+
+export async function companionInfo(
+    baseUrl: string,
+    exportJson: any
+): Promise<CompanionInfo> {
+    const build = String(exportJson?.companionBuild ?? '');
+    if (known && known.baseUrl === baseUrl && known.build === build) {
+        return known.info;
+    }
+    const info = await detectCompanion(baseUrl, exportJson);
+    known = { baseUrl, build, info };
+    return info;
+}
+
+export function forgetCompanion() {
+    known = null;
+}
+
+async function withOps<T>(
+    baseUrl: string,
+    run: (_ops: CompanionOps) => Promise<T>
+): Promise<T> {
+    const info = await companionInfo(
+        baseUrl,
+        await readCompanionExport(baseUrl)
+    );
+    if (!info.generation) {
+        throw new Error(`Unsupported Companion version ${info.version}`.trim());
+    }
+    const ops = await openOps(baseUrl, info.generation);
+    try {
+        return await run(ops);
+    } catch (e) {
+        // A call that failed may mean Companion changed under us; check the
+        // version again on the next read.
+        forgetCompanion();
+        throw e;
+    } finally {
+        ops.close();
+    }
+}
+
+export function saveCompanionButton(
+    baseUrl: string,
+    edit: ButtonEdit
+): Promise<void> {
+    return withOps(baseUrl, (ops) => saveButtonWith(ops, edit));
+}
+
+export function clearCompanionButton(
     baseUrl: string,
     page: number,
     row: number,
     column: number
 ): Promise<void> {
-    const s = await TrpcSession.open(baseUrl);
+    return withOps(baseUrl, (ops) => ops.clearButton(page, row, column));
+}
+
+export async function readCompanionLayout(
+    baseUrl: string
+): Promise<CompanionLayout> {
+    let json: any;
     try {
-        await s.mutate('controls.resetControl', {
-            location: { pageNumber: page, row, column },
-        });
-    } finally {
-        s.close();
+        json = await readCompanionExport(baseUrl);
+    } catch (e) {
+        forgetCompanion();
+        throw e;
     }
+    const info = await companionInfo(baseUrl, json);
+    return {
+        ...parseCompanionExport(json),
+        version: info.version,
+        editable: !!info.generation,
+        untested: !!info.generation && isUntestedRaw(info.version),
+    };
 }
 
 // #endregion

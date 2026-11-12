@@ -133,11 +133,31 @@ describe('vMix / X-Air audio section', () => {
             screen.getByRole('img', { name: 'Wireless mic' })
         ).toBeInTheDocument();
         expect(screen.getByText('Gain +20 dB')).toBeInTheDocument();
-        expect(
-            screen.getByText('−'.concat('50 dB'), { exact: false })
-        ).toBeInTheDocument();
+        // The -50 dB Master start is the fader's own value, not a tag.
+        expect(screen.queryByText('Master −50 dB')).toBeNull();
         expect(screen.getByText('Listening')).toBeInTheDocument();
         expect(screen.getAllByText('Master').length).toBeGreaterThan(0);
+    });
+
+    it('blue mic step: the gain control has no stale +20 dB tag', () => {
+        render(<AudioSection />);
+        push({
+            ...base,
+            wizard: wizard({
+                step: 'blue',
+                control: {
+                    label: 'Blue mic gain',
+                    kind: 'gain',
+                    db: 26,
+                    minDb: -12,
+                    maxDb: 60,
+                    stepDb: 0.5,
+                },
+            }),
+        });
+        expect(screen.queryByText('Gain +20 dB')).toBeNull();
+        expect(screen.getByText('Blue mic gain')).toBeInTheDocument();
+        expect(screen.getByText('Fader 0 dB')).toBeInTheDocument();
     });
 
     it('DJ step: checklist and the stream send off', () => {
@@ -158,7 +178,9 @@ describe('vMix / X-Air audio section', () => {
             }),
         });
         expect(screen.getByText('Laptop volume 100%')).toBeInTheDocument();
-        expect(screen.getByText('DI box level 50%')).toBeInTheDocument();
+        expect(
+            screen.getByText('XLR adapter box level 50%')
+        ).toBeInTheDocument();
         expect(screen.getByText('DJ Bus 1 send off')).toBeInTheDocument();
         expect(screen.getByText('DJ gain')).toBeInTheDocument();
         expect(screen.getByText('Fader 0 dB')).toBeInTheDocument();

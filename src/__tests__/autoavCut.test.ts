@@ -107,7 +107,7 @@ jest.mock('electron-log', () => {
     };
     return { ...l, scope: () => l };
 });
-jest.mock('../main/ftc/scorekeeper', () => {
+jest.mock('../main/addons/ftc-scorekeeper', () => {
     // eslint-disable-next-line global-require
     const { EventEmitter: E } = require('events');
     const inst = Object.assign(new E(), {
@@ -821,4 +821,20 @@ test('an error after the match is filed keeps its good record (it still uploads)
     expect(rec.status).toBe('recorded');
     expect(rec.filePath).toBeTruthy();
     expect(fs.existsSync(rec.filePath as string)).toBe(true);
+});
+
+// The uploader runs at off-season events only, FRC or FTC.
+describe('uploader at off-season events', () => {
+    test.each([
+        ['frc', true, true],
+        ['frc', false, false],
+        ['ftc', true, true],
+        ['ftc', false, false],
+    ])('%s off-season=%s: runs=%s', (program, off, runs) => {
+        offSeason = off as boolean;
+        cfg.program = program;
+        const { a } = newAutoAV();
+        expect(a.runsUploader()).toBe(runs);
+        expect(a.getStatus().uploader).toBe(runs);
+    });
 });

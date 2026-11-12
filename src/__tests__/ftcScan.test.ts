@@ -1,4 +1,4 @@
-import FtcScorekeeper from '../main/ftc/scorekeeper';
+import FtcScorekeeper from '../main/addons/ftc-scorekeeper';
 
 jest.mock('os', () => ({ networkInterfaces: () => ({}) }));
 jest.mock('electron-log', () => {

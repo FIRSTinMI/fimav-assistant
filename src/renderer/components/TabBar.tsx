@@ -60,8 +60,8 @@ const tabs: TabDef[] = [
         label: 'Upload',
         icon: <YoutubeFilled />,
         isActive: (p) => p.startsWith('/upload'),
-        // FTC events in either season; FRC off-season only.
-        showIf: (s) => s.program === 'ftc' || s.season === 'off-season',
+        // Off-season events only, FRC or FTC.
+        showIf: (s) => s.uploader,
     },
     {
         key: '/audiencedisplay',

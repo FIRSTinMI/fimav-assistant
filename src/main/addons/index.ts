@@ -7,7 +7,7 @@ import AutoAV from './autoav';
 import LiveCaptions from './live-captions';
 import YoutubeUploaderAddon from './upload-helper';
 import AudienceDisplayAddon from './audience-display';
-import FtcScorekeeper from '../ftc/scorekeeper';
+import FtcScorekeeper from './ftc-scorekeeper';
 import { logsPath } from '../util';
 import { killRunningFfmpeg } from '../cutMatch';
 import HWPing from './hw-ping';
@@ -25,6 +25,8 @@ export default class Addons {
     private audienceDisplay: AudienceDisplayAddon =
         AudienceDisplayAddon.Instance;
 
+    private ftcScorekeeper: FtcScorekeeper = FtcScorekeeper.Instance;
+
     public init(): Addons {
         this.restartAll();
         return this;
@@ -38,7 +40,7 @@ export default class Addons {
         // where a running cut must carry on.
         killRunningFfmpeg();
         this.HWPing.stop();
-        FtcScorekeeper.Instance.stop();
+        this.ftcScorekeeper.stop();
         await Promise.all([
             this.liveCaptions.stop(),
             this.youtubeUploader.stop(),
@@ -77,7 +79,7 @@ export default class Addons {
         this.audienceDisplay.start();
 
         // Connect to the FTC Live scorekeeper if one is set
-        FtcScorekeeper.Instance.start();
+        this.ftcScorekeeper.start();
     }
 
     // Manage the logs, removing old and moving old copies to a new folder

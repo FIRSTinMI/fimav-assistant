@@ -71,9 +71,10 @@ export type AppConfig = {
         matchSeconds: number;
         tailSeconds: number;
     };
-    // YouTube + TBA upload settings for the Upload tab. Persisted here and also
-    // pushed to the youtube-tba-upload process via POST /api/upload/config.
-    // Field shapes mirror the uploader's eventConfig (INTEGRATION.md §4).
+    // YouTube + TBA upload settings for the Upload tab. Stored here only, and
+    // pushed to the youtube-tba-upload process (POST /api/upload/config) when
+    // it starts, when it switches event and on every save. The uploader never
+    // serves the credentials back.
     upload: {
         // TBA event key videos are filed and submitted under (e.g. 2026midet).
         // Empty = season year + the FMS event code.
@@ -94,8 +95,11 @@ export type AppConfig = {
     };
 };
 
-// UI defaults must equal the uploader's own defaults verbatim (INTEGRATION.md
-// §4 / state.go), so the form shows exactly what the uploader would fill.
+// Default title and description templates. This app owns them: the uploader
+// is sent the stored templates whenever it starts or switches event, so its
+// own built-in defaults never reach a video. The uploader drops a line whose
+// team slot is not there, so the third-team lines vanish at FTC events (two
+// teams per alliance) and the same template serves FRC and FTC.
 export const DEFAULT_TITLE_TEMPLATE =
     '{video_prefix} {match_level} Match {match_number}{play_suffix}';
 export const DEFAULT_DESCRIPTION_TEMPLATE = [

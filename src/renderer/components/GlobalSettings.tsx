@@ -22,7 +22,9 @@ const send = (channel: string, ...args: unknown[]) =>
 
 // App-wide settings, opened from "Settings" in the menu bar: FRC / FTC
 // (detected, with an override), the FRC off-season audience display (reset
-// to FMS at each new event) and the FTC Live scorekeeper. FTC recording
+// to FMS at each new event), FRC off-season match video upload (off by
+// default; turns on the uploader and the Upload tab) and the FTC Live
+// scorekeeper. FTC recording
 // length lives in Auto AV's settings.
 export default function GlobalSettings() {
     const [open, setOpen] = useState(false);

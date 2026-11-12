@@ -6,7 +6,7 @@ import AutoAV from '../addons/autoav';
 import LiveCaptions from '../addons/live-captions';
 import getVmixBandwidth, { VmixBandwidth } from '../vmixBandwidth';
 import { listMatches } from '../recordings/matchStore';
-import FtcScorekeeper from '../ftc/scorekeeper';
+import FtcScorekeeper from '../addons/ftc-scorekeeper';
 import YoutubeUploaderAddon from '../addons/upload-helper';
 import AudienceDisplayAddon from '../addons/audience-display';
 import {
@@ -18,9 +18,9 @@ import {
 import { getStore } from '../store';
 import Checks from '../checks/engine';
 
-// Read-only status API on the LAN, one endpoint per subsystem, for Companion
-// or anything else on the cart network to poll. No auth by design: every
-// response is status only and nothing here changes state.
+// Read-only status API on 127.0.0.1, one endpoint per subsystem, for Companion
+// or anything else on the cart PC to poll. No auth by design: every response
+// is status only and nothing here changes state.
 export const STATUS_API_PORT = 7780;
 
 // vMix status is built inside register-events (it owns the stream-key
@@ -101,7 +101,7 @@ export default function startStatusApi(sources: StatusApiSources) {
                     return kv ? { checked: kv.checked, match: kv.match } : null;
                 })(),
                 bandwidthSupported: bw.supported,
-                // Stream keys stay off the LAN: drop the rtmp URL.
+                // Stream keys stay out of the API: drop the rtmp URL.
                 streams: bw.streams.map(({ rtmpUrl: _rtmpUrl, ...s }) => s),
             };
         },
@@ -122,42 +122,35 @@ export default function startStatusApi(sources: StatusApiSources) {
             ...FtcScorekeeper.Instance.getStatus(),
             recorder: AutoAV.Instance.ftcRecorderSummary(),
         }),
-        // YouTube uploader: state and queue counts only. Its settings hold
-        // the TBA secret and TOA key, so nothing else is passed through.
+        // YouTube uploader: state and queue counts only. Counts come from its
+        // event stream, so nothing here reads the uploader's event config.
         upload: async () => {
-            const running = YoutubeUploaderAddon.Instance.isRunning();
-            const base = `http://127.0.0.1:${YoutubeUploaderAddon.PORT}`;
-            // The key the uploader is on: any other key starts a second
-            // upload manager on the same folder.
-            const eventKey = YoutubeUploaderAddon.Instance.eventKey();
-            const [health, state] = running
-                ? await Promise.all([
-                      getJson(`${base}/api/health`),
-                      eventKey
-                          ? getJson(
-                                `${base}/api/upload/state?event_key=${encodeURIComponent(
-                                    eventKey
-                                )}`
-                            )
-                          : null,
-                  ])
-                : [null, null];
-            const queue: Record<string, number> = {};
-            Object.values<{ status?: string }>(state?.videos ?? {}).forEach(
-                (v) => {
-                    const k = v?.status ?? 'unknown';
-                    queue[k] = (queue[k] ?? 0) + 1;
-                }
-            );
+            const up = YoutubeUploaderAddon.Instance;
+            const running = up.isRunning();
+            const health = running
+                ? await getJson(
+                      `http://127.0.0.1:${YoutubeUploaderAddon.PORT}/api/health`
+                  )
+                : null;
+            const hello = up.events.latest.get('hello') as
+                | { queue?: { counts?: Record<string, number> } }
+                | undefined;
+            const queue = (up.events.latest.get('queue') ?? hello?.queue) as
+                | { counts?: Record<string, number> }
+                | undefined;
             return {
                 running,
-                phase: YoutubeUploaderAddon.Instance.getPhase(),
-                version: YoutubeUploaderAddon.Instance.getVersion(),
+                phase: up.getPhase(),
+                version: up.getVersion(),
+                selected: AutoAV.Instance.runsUploader(),
                 program: health?.program ?? null,
                 signedIn: health ? !!health.signed_in : null,
                 channel: health?.channel_name ?? null,
                 watching: health?.watching ?? null,
-                queue: state ? queue : null,
+                queue:
+                    running && up.events.connected
+                        ? queue?.counts ?? {}
+                        : null,
             };
         },
         // Custom audience display (FRC off-season).
@@ -259,8 +252,8 @@ export default function startStatusApi(sources: StatusApiSources) {
     });
 
     server.on('error', (e) => log.error('Status API server error', e));
-    server.listen(STATUS_API_PORT, '0.0.0.0', () =>
-        log.info(`Status API listening on :${STATUS_API_PORT}`)
+    server.listen(STATUS_API_PORT, '127.0.0.1', () =>
+        log.info(`Status API listening on 127.0.0.1:${STATUS_API_PORT}`)
     );
     return server;
 }

@@ -28,6 +28,10 @@ import {
 // Each update is also a Bitfocus trigger: the Companion button mapped to
 // "<type>:<field>" is pressed, the same job the FMS audience display does for
 // FRC (FTC's official display cannot press Companion buttons).
+//
+// Started and stopped with the other add-ons (see index.ts). It runs no
+// process of its own, so it has none of the download, kill sweep or phase
+// plumbing: getStatus() and the 'status' event say whether it is connected.
 
 // Ports FTC Live uses: 80 by default, 28080 when 80 is taken (Linux
 // launcher), 8080 on a Windows install next to FMS (which holds 80).

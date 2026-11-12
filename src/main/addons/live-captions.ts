@@ -6,13 +6,12 @@ import { AddonLoggers } from './addon-loggers';
 import AddonPhaseTracker from './addon-phase';
 import AddonEvents from './addon-events';
 import { getStore } from '../store';
+import SerialQueue from '../serial-queue';
+import killByNameAndPort from './kill-process';
 import {
-    SerialQueue,
-    compareVersions,
+    UpdateInfo,
+    checkForUpdate,
     downloadRelease,
-    killByNameAndPort,
-    latestReleaseVersion,
-    newestLocalVersion,
 } from './release-download';
 
 export default class LiveCaptions {
@@ -105,31 +104,27 @@ export default class LiveCaptions {
         this.killExisting();
 
         this.phase.set('updating');
-        // Newest live-captions-<version>.exe already downloaded
-        let currentVersion = newestLocalVersion('live-captions');
 
         // Update check + download is best-effort: if we're offline (e.g. at a
-        // venue) or the download fails, fall back to the newest local exe rather
-        // than throwing and leaving live-captions down.
-        try {
-            const baseUrl = getStore().get('liveCaptionsDownloadBase');
-            const latestVersion = await latestReleaseVersion(baseUrl);
-
-            if (
-                latestVersion &&
-                compareVersions(latestVersion, currentVersion) > 0
-            ) {
-                this.logs.out.log(
-                    `Found new version of live-captions, currently at ${currentVersion}, downloading ${latestVersion}`
-                );
-                await downloadRelease(baseUrl, 'live-captions', latestVersion);
-                currentVersion = latestVersion;
-            }
-        } catch (e) {
-            this.logs.err.warn(
-                `Update check failed, using local v${currentVersion}`,
-                e
+        // venue) or the download fails, fall back to the newest local exe
+        // (live-captions-<version>.exe in userData) rather than throwing and
+        // leaving live-captions down.
+        const baseUrl = getStore().get('liveCaptionsDownloadBase');
+        const update = await this.checkForUpdate();
+        let currentVersion = update.current;
+        if (update.updateAvailable) {
+            this.logs.out.log(
+                `Found new version of live-captions, currently at ${currentVersion}, downloading ${update.latest}`
             );
+            try {
+                await downloadRelease(baseUrl, 'live-captions', update.latest);
+                currentVersion = update.latest;
+            } catch (e) {
+                this.logs.err.warn(
+                    `Update download failed, using local v${currentVersion}`,
+                    e
+                );
+            }
         }
 
         if (currentVersion === '0.0.0') {
@@ -247,24 +242,12 @@ export default class LiveCaptions {
     }
 
     // Check GitHub for a newer live-captions without downloading it.
-    public async checkForUpdate(): Promise<{
-        current: string;
-        latest: string;
-        updateAvailable: boolean;
-    }> {
-        const current = newestLocalVersion('live-captions');
-        let latest = current;
-        try {
-            const baseUrl = getStore().get('liveCaptionsDownloadBase');
-            latest = (await latestReleaseVersion(baseUrl)) ?? current;
-        } catch (e) {
-            this.logs.err.warn('Update check failed', e);
-        }
-        return {
-            current,
-            latest,
-            updateAvailable: compareVersions(latest, current) > 0,
-        };
+    public checkForUpdate(): Promise<UpdateInfo> {
+        return checkForUpdate(
+            'live-captions',
+            getStore().get('liveCaptionsDownloadBase'),
+            this.logs.err
+        );
     }
 
     public static get Instance(): LiveCaptions {

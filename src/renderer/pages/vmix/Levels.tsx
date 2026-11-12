@@ -174,7 +174,7 @@ function Fader({ w }: { w: WizardState }) {
 function SourceStep({ w }: { w: WizardState }) {
     const row = w.rows.find((r) => r.id === w.step);
     const [laptop, setLaptop] = useState(false);
-    const [di, setDi] = useState(false);
+    const [adapter, setAdapter] = useState(false);
     const st = row ? STATUS[row.status] : null;
     return (
         <div className="levels-step">
@@ -190,10 +190,10 @@ function SourceStep({ w }: { w: WizardState }) {
                             Laptop volume 100%
                         </Checkbox>
                         <Checkbox
-                            checked={di}
-                            onChange={(e) => setDi(e.target.checked)}
+                            checked={adapter}
+                            onChange={(e) => setAdapter(e.target.checked)}
                         >
-                            DI box level 50%
+                            XLR adapter box level 50%
                         </Checkbox>
                     </Space>
                 )}
@@ -204,8 +204,12 @@ function SourceStep({ w }: { w: WizardState }) {
                     {w.step === 'match' && w.matchRunning && (
                         <Tag>{w.matchRunning}</Tag>
                     )}
+                    {/* The +20 dB start is a setup note; when the on-screen
+                        control is the gain itself (blue mic) it shows the
+                        live value, so the tag would only go stale. */}
                     {(w.step === 'red' || w.step === 'blue') &&
-                        !w.noGain.includes(w.step) && <Tag>Gain +20 dB</Tag>}
+                        !w.noGain.includes(w.step) &&
+                        w.control?.kind !== 'gain' && <Tag>Gain +20 dB</Tag>}
                     {(w.step === 'red' ||
                         w.step === 'blue' ||
                         w.step === 'dj') &&
@@ -214,7 +218,6 @@ function SourceStep({ w }: { w: WizardState }) {
                         ) : (
                             <Tag>Fader 0 dB</Tag>
                         ))}
-                    {w.step === 'red' && <Tag>Master {MINUS}50 dB</Tag>}
                     {w.step === 'dj' && w.djSendOff && (
                         <Tag color="warning">DJ Bus 1 send off</Tag>
                     )}
