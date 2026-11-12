@@ -29,6 +29,17 @@ export function parseVersion(raw: unknown): CompanionVersion | null {
 const at = (v: CompanionVersion, major: number, minor: number) =>
     v.major > major || (v.major === major && v.minor >= minor);
 
+// Newest release the adapters were tested against end to end. A newer one
+// still edits when its probe passes, but the tab marks it untested.
+const NEWEST_TESTED = { major: 5, minor: 1, patch: 2 };
+
+export function isUntested(v: CompanionVersion): boolean {
+    const t = NEWEST_TESTED;
+    if (v.major !== t.major) return v.major > t.major;
+    if (v.minor !== t.minor) return v.minor > t.minor;
+    return v.patch > t.patch;
+}
+
 // The adapter written for this version, or null before 5.0. A version newer
 // than 5.1 maps to the 5.1 adapter; the probe then decides whether it fits.
 export function generationFor(v: CompanionVersion): Generation | null {

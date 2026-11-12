@@ -45,6 +45,8 @@ export interface CompanionLayout {
     // Companion is 5.0 or 5.1 (or newer with the same calls). When false the
     // layout is still shown, read only.
     editable: boolean;
+    // Editable, but newer than the newest release tested (5.1.2)
+    untested: boolean;
 }
 
 // #endregion

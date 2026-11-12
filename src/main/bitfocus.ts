@@ -1,6 +1,7 @@
 import zlib from 'zlib';
 import { CompanionOps, DownAction, openOps } from './companion/adapters';
 import { CompanionInfo, detectCompanion } from './companion/detect';
+import { isUntested, parseVersion } from './companion/version';
 import {
     CompanionAction,
     CompanionButton,
@@ -12,6 +13,12 @@ import {
     matchActionDef,
 } from '../models/Bitfocus';
 import { getStore } from './store';
+
+// A version string that parses and is newer than the newest one tested.
+function isUntestedRaw(raw: string): boolean {
+    const v = parseVersion(raw);
+    return !!v && isUntested(v);
+}
 
 // Bitfocus Companion + audience-display trigger access for the Bitfocus tab.
 //
@@ -75,7 +82,7 @@ function buttonActions(ctl: any): CompanionAction[] {
 // export has the same per-page shape.
 export function parseCompanionExport(
     json: any
-): Omit<CompanionLayout, 'version' | 'editable'> {
+): Omit<CompanionLayout, 'version' | 'editable' | 'untested'> {
     const pages: CompanionPage[] = Object.entries(json.pages ?? {})
         .map(([num, p]: [string, any]) => {
             const buttons: Record<string, CompanionButton> = {};
@@ -298,6 +305,7 @@ export async function readCompanionLayout(
         ...parseCompanionExport(json),
         version: info.version,
         editable: !!info.generation,
+        untested: !!info.generation && isUntestedRaw(info.version),
     };
 }
 

@@ -950,12 +950,14 @@ export default function Bitfocus() {
                     title="Buttons"
                     extra={
                         layout &&
-                        !layout.editable && (
+                        (!layout.editable || layout.untested) && (
                             <Tag
                                 color="gold"
                                 title={layout.version || undefined}
                             >
-                                Unsupported Companion version
+                                {layout.editable
+                                    ? 'Untested Companion version'
+                                    : 'Unsupported Companion version'}
                             </Tag>
                         )
                     }

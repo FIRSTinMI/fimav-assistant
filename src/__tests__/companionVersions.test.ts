@@ -8,6 +8,7 @@ import {
     generationFor,
     parseVersion,
     Generation,
+    isUntested,
 } from '../main/companion/version';
 import {
     missingProcedures,
@@ -242,5 +243,20 @@ describe('Companion export', () => {
             text: 'Go',
         });
         expect(layout.connections[0].module).toBe('studiocoast-vmix');
+    });
+});
+
+describe('untested versions', () => {
+    test.each([
+        ['5.0.7', false],
+        ['5.1.2', false],
+        ['5.1.2+10019-stable-98d5d4e1a1', false],
+        ['5.1.3', true],
+        ['5.2.0', true],
+        ['6.0.0', true],
+    ])('%s untested=%s', (raw, untested) => {
+        const v = parseVersion(raw);
+        expect(v).not.toBeNull();
+        expect(isUntested(v!)).toBe(untested);
     });
 });
