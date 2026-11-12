@@ -1705,7 +1705,9 @@ export default class Checks extends EventEmitter {
 
     // live-captions sends captions to YouTube by the stream key. The key it
     // holds must be the one vMix streams with: the live stream's, or the
-    // settings' before going live.
+    // settings' before going live. At official FRC events the volunteers
+    // may not be given a caption key, so a problem there is shown without
+    // a warning: the detail and the fix stay for a crew that has the key.
     private checkCaptionsYoutube(streaming: boolean) {
         if (!LiveCaptions.Instance.isRunning()) {
             this.set(
@@ -1732,32 +1734,36 @@ export default class Checks extends EventEmitter {
             this.settings?.youtubeKey ||
             null;
         const key = keyFromCaptionUrl(p.url);
+        const warn: CheckState =
+            !AutoAV.Instance.isFtc() && !AutoAV.Instance.isOffSeason()
+                ? 'unknown'
+                : 'warning';
         const setKey: Fix | undefined = streamKey
             ? { label: 'Set key', run: () => setCaptionKey(streamKey) }
             : undefined;
         if (!key) {
             this.set(
                 'captions-youtube',
-                'warning',
+                warn,
                 'No YouTube caption key',
                 setKey
             );
         } else if (streamKey && key !== streamKey) {
             this.set(
                 'captions-youtube',
-                'warning',
+                warn,
                 'Caption key not the stream key',
                 setKey
             );
         } else if (!p.enabled) {
-            this.set('captions-youtube', 'warning', 'YouTube captions off', {
+            this.set('captions-youtube', warn, 'YouTube captions off', {
                 label: 'Turn on',
                 run: enableCaptionPush,
             });
         } else if (
             this.held('captions-push-error', streaming && !!p.lastError, 30000)
         ) {
-            this.set('captions-youtube', 'warning', p.lastError!);
+            this.set('captions-youtube', warn, p.lastError!);
         } else {
             this.set('captions-youtube', 'ok', 'Key set');
         }
