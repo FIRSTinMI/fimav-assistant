@@ -16,7 +16,8 @@ export interface CompanionAction {
 }
 
 export interface CompanionButton {
-    // 'button-layered' is an editable button; page up/down/number are not.
+    // 'button' is a normal button (Companion's 'button' before 5.0,
+    // 'button-layered' from 5.0); page up/down/number keep Companion's type.
     type: string;
     text: string;
     actions: CompanionAction[];
@@ -40,6 +41,11 @@ export interface CompanionConnection {
 export interface CompanionLayout {
     pages: CompanionPage[];
     connections: CompanionConnection[];
+    // Version Companion reported, '' when it could not be read
+    version: string;
+    // An adapter for this Companion's editing API passed its probe. When
+    // false the layout is still shown, read only.
+    editable: boolean;
 }
 
 // #endregion

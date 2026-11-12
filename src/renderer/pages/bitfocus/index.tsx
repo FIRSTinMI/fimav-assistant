@@ -78,7 +78,7 @@ const defFor = (a: CompanionAction) =>
 // A button the editor can change: a normal button whose press actions are all
 // in the catalog. Anything else is edited in Companion.
 const isEditable = (b: CompanionButton | undefined) =>
-    !b || (b.type === 'button-layered' && b.actions.every((a) => defFor(a)));
+    !b || (b.type === 'button' && b.actions.every((a) => defFor(a)));
 
 // Companion writes a line break in a label as the two characters "\\n".
 const labelToText = (label: string) => label.replace(/\\n/g, '\n');
@@ -318,11 +318,15 @@ function ButtonEditor({
 
     const triggersChanged = [...events].sort().join() !== savedKey;
 
+    // An unknown Companion version is shown but never written to.
+    const unsupported = layout?.editable === false;
+    const editable = !unsupported && isEditable(button);
+
     // The triggers save on their own, so a button only Companion can edit
     // still gets its triggers.
     const save = () => {
         if (triggersChanged) onSaveTriggers(events);
-        if (isEditable(button)) onSave(textToLabel(text), actions);
+        if (editable) onSave(textToLabel(text), actions);
         else onClose();
     };
 
@@ -352,7 +356,6 @@ function ButtonEditor({
 
     const groups = useMemo(() => actionGroups(defs, layout), [defs, layout]);
 
-    const editable = isEditable(button);
     const title = `${page?.name ?? ''} ${
         cell ? `${cell.row}/${cell.column}` : ''
     }`;
@@ -455,7 +458,11 @@ function ButtonEditor({
                 </Form>
             ) : (
                 <Form layout="vertical">
-                    <Tag color="gold">Companion only</Tag>
+                    <Tag color="gold">
+                        {unsupported
+                            ? 'Unsupported Companion version'
+                            : 'Companion only'}
+                    </Tag>
                     <div className="bf-readonly">
                         {(button?.actions ?? []).map((a) => (
                             <div key={a.id}>
@@ -476,10 +483,13 @@ function ButtonEditor({
 
 function ButtonGrid({
     page,
+    locked,
     hasTriggers,
     onPick,
 }: {
     page: CompanionPage;
+    // Companion's version has no editor: every button is read only.
+    locked: boolean;
     hasTriggers: (_row: number, _column: number) => boolean;
     onPick: (_row: number, _column: number) => void;
 }) {
@@ -492,7 +502,9 @@ function ButtonGrid({
                     type="button"
                     key={`${r}/${c}`}
                     className={`bf-cell${b ? ' bf-cell--set' : ''}${
-                        b && !isEditable(b) ? ' bf-cell--locked' : ''
+                        b && (locked || !isEditable(b))
+                            ? ' bf-cell--locked'
+                            : ''
                     }${hasTriggers(r, c) ? ' bf-cell--fms' : ''}`}
                     title={`${r}/${c}`}
                     onClick={() => onPick(r, c)}
@@ -933,7 +945,21 @@ export default function Bitfocus() {
                 }
             />
             <div className="bf-page">
-                <Card size="small" title="Buttons">
+                <Card
+                    size="small"
+                    title="Buttons"
+                    extra={
+                        layout &&
+                        !layout.editable && (
+                            <Tag
+                                color="gold"
+                                title={layout.version || undefined}
+                            >
+                                Unsupported Companion version
+                            </Tag>
+                        )
+                    }
+                >
                     {layout ? (
                         <>
                             <Tabs
@@ -947,6 +973,7 @@ export default function Bitfocus() {
                             {page && (
                                 <ButtonGrid
                                     page={page}
+                                    locked={!layout.editable}
                                     hasTriggers={(r, c) =>
                                         triggersAt(r, c).length > 0
                                     }
