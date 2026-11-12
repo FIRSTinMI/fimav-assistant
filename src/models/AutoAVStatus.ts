@@ -38,8 +38,12 @@ export interface AutoAVStatus {
     fileNameMode: FileNameMode;
     // In-season or off-season, detected (official event = in-season, no event
     // = in-season January to April): gates the off-season-only features
-    // (YouTube uploader, Upload tab, custom display, dead-time cutting).
+    // (YouTube uploader and Upload tab when opted in, custom display,
+    // dead-time cutting).
     season: 'in-season' | 'off-season';
+    // The YouTube uploader and Upload tab are in use: FRC off-season with
+    // match video upload on in Settings.
+    uploader: boolean;
     // True when the event itself sets the mode (official = in-season,
     // unofficial = off-season), so the stored fallback setting does nothing.
     fileNameModeForced: boolean;

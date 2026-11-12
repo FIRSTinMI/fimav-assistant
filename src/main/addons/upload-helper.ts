@@ -35,7 +35,9 @@ export default class YoutubeUploaderAddon {
     public readonly phase = new AddonPhaseTracker();
 
     // Its /api/events stream while running (sign-in, queue, uploads, quota,
-    // what it watches).
+    // what it watches). Also emits 'key' when the applied event key moves,
+    // and 'target' when the uploader starts or moves to a new folder or
+    // program, i.e. whenever it needs this app's upload settings.
     public readonly events = new AddonEvents(
         'youtube-tba-upload',
         'http://127.0.0.1:8807/api/events',
@@ -139,9 +141,9 @@ export default class YoutubeUploaderAddon {
     private async doStart(): Promise<boolean> {
         this.killExisting();
 
-        // Match-video uploads: FTC events in either season, FRC off-season.
+        // Match-video uploads: FRC off-season, when turned on in Settings.
         if (!AutoAV.Instance.runsUploader()) {
-            this.logs.out.log('In-season FRC event; YouTube uploader off');
+            this.logs.out.log('Match video upload not in use; uploader off');
             this.running = false;
             return false;
         }
@@ -279,6 +281,9 @@ export default class YoutubeUploaderAddon {
                 this.logs.out.log(
                     `YouTube uploader is serving on port ${YoutubeUploaderAddon.PORT} (v${this.currentVersion})`
                 );
+                // A fresh process holds only its built-in templates: the
+                // host sends its own (see 'target').
+                this.events.emit('target');
                 return true;
             }
 
@@ -448,12 +453,19 @@ export default class YoutubeUploaderAddon {
                     program: ftc ? 'ftc' : 'frc',
                     ftcUrl: ftc && address ? `http://${address}` : undefined,
                 });
+                // A new folder or program is a new event config in the
+                // uploader. A key-only switch is pushed by its caller, which
+                // carries the playlist across.
+                const moved =
+                    videoDir !== this.appliedDir ||
+                    (ftc ? 'ftc' : 'frc') !== this.appliedProgram;
                 this.setAppliedKey(key);
                 this.appliedDir = videoDir;
                 this.appliedProgram = AutoAV.Instance.isFtc() ? 'ftc' : 'frc';
                 this.logs.out.log(
                     `YouTube uploader now watching ${videoDir} (${this.eventKey()})`
                 );
+                if (moved) this.events.emit('target');
                 return true;
             } catch (e) {
                 if (!restartIfRefused) {

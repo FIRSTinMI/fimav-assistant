@@ -48,6 +48,10 @@ export type AppConfig = {
     };
     // FRC / FTC override from Settings; 'auto' follows detection.
     program: 'auto' | 'frc' | 'ftc';
+    // FRC off-season: upload match videos to YouTube (Settings, off by
+    // default). Off means the uploader never runs and the Upload tab is
+    // hidden.
+    matchVideoUpload: boolean;
     // FRC off-season: which audience display is used, the official FMS one
     // or our custom one (Settings; back to 'fms' on every new event). It
     // decides whether the custom display runs, which display the vMix input
@@ -71,9 +75,10 @@ export type AppConfig = {
         matchSeconds: number;
         tailSeconds: number;
     };
-    // YouTube + TBA upload settings for the Upload tab. Persisted here and also
-    // pushed to the youtube-tba-upload process via POST /api/upload/config.
-    // Field shapes mirror the uploader's eventConfig (INTEGRATION.md §4).
+    // YouTube + TBA upload settings for the Upload tab. Stored here only, and
+    // pushed to the youtube-tba-upload process (POST /api/upload/config) when
+    // it starts, when it switches event and on every save. The uploader never
+    // serves the credentials back.
     upload: {
         // TBA event key videos are filed and submitted under (e.g. 2026midet).
         // Empty = season year + the FMS event code.
@@ -94,8 +99,11 @@ export type AppConfig = {
     };
 };
 
-// UI defaults must equal the uploader's own defaults verbatim (INTEGRATION.md
-// §4 / state.go), so the form shows exactly what the uploader would fill.
+// Default title and description templates. This app owns them: the uploader
+// is sent the stored templates whenever it starts or switches event, so its
+// own built-in defaults never reach a video. The uploader drops a line whose
+// team slot is not there, so the third-team lines vanish at FTC events (two
+// teams per alliance) and the same template serves FRC and FTC.
 export const DEFAULT_TITLE_TEMPLATE =
     '{video_prefix} {match_level} Match {match_number}{play_suffix}';
 export const DEFAULT_DESCRIPTION_TEMPLATE = [
@@ -212,6 +220,7 @@ export function createStore(): Store<AppConfig> {
                 },
             },
             program: { type: 'string', default: 'auto' },
+            matchVideoUpload: { type: 'boolean', default: false },
             frcAudienceDisplay: { type: 'string', default: 'fms' },
             companionPort: { type: 'number', default: 8888 },
             checks: {

@@ -122,42 +122,35 @@ export default function startStatusApi(sources: StatusApiSources) {
             ...FtcScorekeeper.Instance.getStatus(),
             recorder: AutoAV.Instance.ftcRecorderSummary(),
         }),
-        // YouTube uploader: state and queue counts only. Its settings hold
-        // the TBA secret and TOA key, so nothing else is passed through.
+        // YouTube uploader: state and queue counts only. Counts come from its
+        // event stream, so nothing here reads the uploader's event config.
         upload: async () => {
-            const running = YoutubeUploaderAddon.Instance.isRunning();
-            const base = `http://127.0.0.1:${YoutubeUploaderAddon.PORT}`;
-            // The key the uploader is on: any other key starts a second
-            // upload manager on the same folder.
-            const eventKey = YoutubeUploaderAddon.Instance.eventKey();
-            const [health, state] = running
-                ? await Promise.all([
-                      getJson(`${base}/api/health`),
-                      eventKey
-                          ? getJson(
-                                `${base}/api/upload/state?event_key=${encodeURIComponent(
-                                    eventKey
-                                )}`
-                            )
-                          : null,
-                  ])
-                : [null, null];
-            const queue: Record<string, number> = {};
-            Object.values<{ status?: string }>(state?.videos ?? {}).forEach(
-                (v) => {
-                    const k = v?.status ?? 'unknown';
-                    queue[k] = (queue[k] ?? 0) + 1;
-                }
-            );
+            const up = YoutubeUploaderAddon.Instance;
+            const running = up.isRunning();
+            const health = running
+                ? await getJson(
+                      `http://127.0.0.1:${YoutubeUploaderAddon.PORT}/api/health`
+                  )
+                : null;
+            const hello = up.events.latest.get('hello') as
+                | { queue?: { counts?: Record<string, number> } }
+                | undefined;
+            const queue = (up.events.latest.get('queue') ?? hello?.queue) as
+                | { counts?: Record<string, number> }
+                | undefined;
             return {
                 running,
-                phase: YoutubeUploaderAddon.Instance.getPhase(),
-                version: YoutubeUploaderAddon.Instance.getVersion(),
+                phase: up.getPhase(),
+                version: up.getVersion(),
+                selected: AutoAV.Instance.runsUploader(),
                 program: health?.program ?? null,
                 signedIn: health ? !!health.signed_in : null,
                 channel: health?.channel_name ?? null,
                 watching: health?.watching ?? null,
-                queue: state ? queue : null,
+                queue:
+                    running && up.events.connected
+                        ? queue?.counts ?? {}
+                        : null,
             };
         },
         // Custom audience display (FRC off-season).
