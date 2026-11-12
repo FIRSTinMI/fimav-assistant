@@ -25,6 +25,9 @@ const lcEvents = {
 let audioDevices: any[] = [];
 let customAd = false;
 let uploaderUsed = false;
+// AutoAV's program and season: FRC off-season unless a test says so.
+let ftc = false;
+let offSeason = true;
 let upPhase = 'running';
 const upEvents = {
     connected: false,
@@ -100,6 +103,8 @@ jest.mock('../main/addons/autoav', () => ({
             matchInPlay: () => match,
             runsCustomAd: () => customAd,
             runsUploader: () => uploaderUsed,
+            isFtc: () => ftc,
+            isOffSeason: () => offSeason,
             getStatus: () => ({ saveFolder: '/event' }),
         },
     },
@@ -317,6 +322,8 @@ beforeEach(() => {
     lcEvents.latest.set('youtube', push);
     customAd = false;
     uploaderUsed = false;
+    ftc = false;
+    offSeason = true;
     upPhase = 'running';
     upEvents.connected = false;
     upEvents.latest.clear();
@@ -882,6 +889,38 @@ describe('stream checks', () => {
             state: 'warning',
             detail: 'No YouTube caption key',
         });
+    });
+
+    it('official FRC event: caption key problems show without a warning', async () => {
+        offSeason = false;
+        const alerts: string[] = [];
+        checks.on('alert', (r: CheckResult) => alerts.push(r.id));
+        push.url = null;
+        await tick(1);
+        expect(get('captions-youtube')).toMatchObject({
+            state: 'unknown',
+            detail: 'No YouTube caption key',
+            fix: 'Set key',
+        });
+        push.url = 'http://upload.youtube.com/closedcaption?cid=old-key';
+        await tick(1);
+        expect(get('captions-youtube')).toMatchObject({
+            state: 'unknown',
+            detail: 'Caption key not the stream key',
+        });
+        expect(alerts).not.toContain('captions-youtube');
+        // A key that matches is still OK.
+        push.url = 'http://upload.youtube.com/closedcaption?cid=abcd-efgh';
+        await tick(1);
+        expect(get('captions-youtube').state).toBe('ok');
+    });
+
+    it('official FTC event: a missing caption key is a warning', async () => {
+        offSeason = false;
+        ftc = true;
+        push.url = null;
+        await tick(1);
+        expect(get('captions-youtube').state).toBe('warning');
     });
 
     it('hardware from the status bar pings, list only', async () => {
