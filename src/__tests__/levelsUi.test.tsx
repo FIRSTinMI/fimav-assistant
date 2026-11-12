@@ -139,6 +139,27 @@ describe('vMix / X-Air audio section', () => {
         expect(screen.getAllByText('Master').length).toBeGreaterThan(0);
     });
 
+    it('blue mic step: the gain control has no stale +20 dB tag', () => {
+        render(<AudioSection />);
+        push({
+            ...base,
+            wizard: wizard({
+                step: 'blue',
+                control: {
+                    label: 'Blue mic gain',
+                    kind: 'gain',
+                    db: 26,
+                    minDb: -12,
+                    maxDb: 60,
+                    stepDb: 0.5,
+                },
+            }),
+        });
+        expect(screen.queryByText('Gain +20 dB')).toBeNull();
+        expect(screen.getByText('Blue mic gain')).toBeInTheDocument();
+        expect(screen.getByText('Fader 0 dB')).toBeInTheDocument();
+    });
+
     it('DJ step: checklist and the stream send off', () => {
         render(<AudioSection />);
         push({

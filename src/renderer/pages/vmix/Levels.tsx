@@ -204,8 +204,12 @@ function SourceStep({ w }: { w: WizardState }) {
                     {w.step === 'match' && w.matchRunning && (
                         <Tag>{w.matchRunning}</Tag>
                     )}
+                    {/* The +20 dB start is a setup note; when the on-screen
+                        control is the gain itself (blue mic) it shows the
+                        live value, so the tag would only go stale. */}
                     {(w.step === 'red' || w.step === 'blue') &&
-                        !w.noGain.includes(w.step) && <Tag>Gain +20 dB</Tag>}
+                        !w.noGain.includes(w.step) &&
+                        w.control?.kind !== 'gain' && <Tag>Gain +20 dB</Tag>}
                     {(w.step === 'red' ||
                         w.step === 'blue' ||
                         w.step === 'dj') &&
