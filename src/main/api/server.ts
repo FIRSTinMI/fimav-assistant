@@ -18,9 +18,9 @@ import {
 import { getStore } from '../store';
 import Checks from '../checks/engine';
 
-// Read-only status API on the LAN, one endpoint per subsystem, for Companion
-// or anything else on the cart network to poll. No auth by design: every
-// response is status only and nothing here changes state.
+// Read-only status API on 127.0.0.1, one endpoint per subsystem, for Companion
+// or anything else on the cart PC to poll. No auth by design: every response
+// is status only and nothing here changes state.
 export const STATUS_API_PORT = 7780;
 
 // vMix status is built inside register-events (it owns the stream-key
@@ -101,7 +101,7 @@ export default function startStatusApi(sources: StatusApiSources) {
                     return kv ? { checked: kv.checked, match: kv.match } : null;
                 })(),
                 bandwidthSupported: bw.supported,
-                // Stream keys stay off the LAN: drop the rtmp URL.
+                // Stream keys stay out of the API: drop the rtmp URL.
                 streams: bw.streams.map(({ rtmpUrl: _rtmpUrl, ...s }) => s),
             };
         },
@@ -259,8 +259,8 @@ export default function startStatusApi(sources: StatusApiSources) {
     });
 
     server.on('error', (e) => log.error('Status API server error', e));
-    server.listen(STATUS_API_PORT, '0.0.0.0', () =>
-        log.info(`Status API listening on :${STATUS_API_PORT}`)
+    server.listen(STATUS_API_PORT, '127.0.0.1', () =>
+        log.info(`Status API listening on 127.0.0.1:${STATUS_API_PORT}`)
     );
     return server;
 }

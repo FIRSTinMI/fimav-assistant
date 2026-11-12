@@ -1566,6 +1566,6 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         getAlertsWindow()?.close();
     });
 
-    // LAN status API (read-only), sharing the vMix tab's status builder
+    // Local status API (read-only), sharing the vMix tab's status builder
     startStatusApi({ vmixStatus: buildVmixStatus });
 }

@@ -42,6 +42,17 @@ const pingConfig = {
     timeout: 3,
 };
 
+// The cart switch is at 192.168.25.N9. Some carts still have it at .10N
+// until they are all standardized, so try that when .N9 does not answer.
+export async function probeSwitch(cartNumber: number): Promise<PingResponse> {
+    const n9 = await ping.promise.probe(
+        `192.168.25.${cartNumber}9`,
+        pingConfig
+    );
+    if (n9.alive) return n9;
+    return ping.promise.probe(`192.168.25.10${cartNumber}`, pingConfig);
+}
+
 export default class HWPing {
     private static instance: HWPing;
 
@@ -115,7 +126,7 @@ export default class HWPing {
     private async ping() {
         const promises: Promise<any>[] = [
             // Ping switch
-            ping.promise.probe(`192.168.25.10${this.cartNumber}`, pingConfig),
+            probeSwitch(this.cartNumber),
             // Ping PTZ1
             ping.promise.probe(`192.168.25.${this.cartNumber}1`, pingConfig),
             // Ping PTZ2
