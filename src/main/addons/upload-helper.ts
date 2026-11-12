@@ -7,15 +7,10 @@ import AddonPhaseTracker from './addon-phase';
 import AddonEvents from './addon-events';
 import { getStore } from '../store';
 import AutoAV from './autoav';
-import FtcScorekeeper from '../ftc/scorekeeper';
-import {
-    SerialQueue,
-    compareVersions,
-    downloadRelease,
-    killByNameAndPort,
-    latestReleaseVersion,
-    newestLocalVersion,
-} from './release-download';
+import FtcScorekeeper from './ftc-scorekeeper';
+import SerialQueue from '../serial-queue';
+import killByNameAndPort from './kill-process';
+import { checkForUpdate, downloadRelease } from './release-download';
 
 // YoutubeUploaderAddon spawns and supervises the youtube-tba-upload process, which
 // uploads recorded match videos to YouTube and submits the URLs to The Blue
@@ -160,35 +155,34 @@ export default class YoutubeUploaderAddon {
             return false;
         }
 
-        // Newest exe already downloaded, named youtube-tba-upload-<version>.exe
-        // in the app's userData dir.
-        let currentVersion = newestLocalVersion('youtube-tba-upload');
-
         // Update check + download is best-effort: offline at a venue we fall
-        // back to the newest local exe rather than leaving the uploader down.
+        // back to the newest local exe (youtube-tba-upload-<version>.exe in
+        // userData) rather than leaving the uploader down.
         this.phase.set('updating');
-        try {
-            const baseUrl = getStore().get('youtubeUploaderDownloadBase');
-            const latestVersion = await latestReleaseVersion(baseUrl);
-            if (
-                latestVersion &&
-                compareVersions(latestVersion, currentVersion) > 0
-            ) {
-                this.logs.out.log(
-                    `New YouTube uploader available, currently ${currentVersion}, downloading ${latestVersion}`
-                );
+        const baseUrl = getStore().get('youtubeUploaderDownloadBase');
+        const update = await checkForUpdate(
+            'youtube-tba-upload',
+            baseUrl,
+            this.logs.err
+        );
+        let currentVersion = update.current;
+        if (update.updateAvailable) {
+            this.logs.out.log(
+                `New YouTube uploader available, currently ${currentVersion}, downloading ${update.latest}`
+            );
+            try {
                 await downloadRelease(
                     baseUrl,
                     'youtube-tba-upload',
-                    latestVersion
+                    update.latest
                 );
-                currentVersion = latestVersion;
+                currentVersion = update.latest;
+            } catch (e) {
+                this.logs.err.warn(
+                    `Update download failed, using local v${currentVersion}`,
+                    e
+                );
             }
-        } catch (e) {
-            this.logs.err.warn(
-                `Update check failed, using local v${currentVersion}`,
-                e
-            );
         }
 
         if (currentVersion === '0.0.0') {

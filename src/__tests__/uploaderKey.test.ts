@@ -35,7 +35,7 @@ jest.mock('../main/addons/autoav', () => ({
         },
     },
 }));
-jest.mock('../main/ftc/scorekeeper', () => ({
+jest.mock('../main/addons/ftc-scorekeeper', () => ({
     __esModule: true,
     default: { Instance: { getStatus: () => ({ address: '' }) } },
 }));

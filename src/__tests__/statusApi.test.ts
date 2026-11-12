@@ -33,7 +33,7 @@ jest.mock('../main/addons/autoav', () => ({
         runsCustomAd: () => false,
     },
 }));
-jest.mock('../main/ftc/scorekeeper', () => ({
+jest.mock('../main/addons/ftc-scorekeeper', () => ({
     Instance: {
         getStatus: () => ({
             address: '127.0.0.1:8080',
