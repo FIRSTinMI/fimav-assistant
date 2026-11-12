@@ -107,7 +107,7 @@ jest.mock('electron-log', () => {
     };
     return { ...l, scope: () => l };
 });
-jest.mock('../main/ftc/scorekeeper', () => {
+jest.mock('../main/addons/ftc-scorekeeper', () => {
     // eslint-disable-next-line global-require
     const { EventEmitter: E } = require('events');
     const inst = Object.assign(new E(), {

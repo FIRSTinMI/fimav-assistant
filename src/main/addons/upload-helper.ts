@@ -7,7 +7,7 @@ import AddonPhaseTracker from './addon-phase';
 import AddonEvents from './addon-events';
 import { getStore } from '../store';
 import AutoAV from './autoav';
-import FtcScorekeeper from '../ftc/scorekeeper';
+import FtcScorekeeper from './ftc-scorekeeper';
 import SerialQueue from '../serial-queue';
 import killByNameAndPort from './kill-process';
 import { checkForUpdate, downloadRelease } from './release-download';

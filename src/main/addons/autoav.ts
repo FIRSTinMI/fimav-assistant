@@ -11,7 +11,7 @@ import {
     EquipmentLogType,
 } from '../../models/EquipmentLog';
 import FMSMatchStatus, { TournamentLevel } from '../../models/FMSMatchState';
-import FtcScorekeeper from '../ftc/scorekeeper';
+import FtcScorekeeper from './ftc-scorekeeper';
 import FtcRecorder from '../ftc/recorder';
 import { FtcScorekeeperStatus, FtcUpdate } from '../../models/Ftc';
 import attemptRename, {

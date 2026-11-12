@@ -6,7 +6,7 @@ import AutoAV from '../addons/autoav';
 import LiveCaptions from '../addons/live-captions';
 import getVmixBandwidth, { VmixBandwidth } from '../vmixBandwidth';
 import { listMatches } from '../recordings/matchStore';
-import FtcScorekeeper from '../ftc/scorekeeper';
+import FtcScorekeeper from '../addons/ftc-scorekeeper';
 import YoutubeUploaderAddon from '../addons/upload-helper';
 import AudienceDisplayAddon from '../addons/audience-display';
 import {

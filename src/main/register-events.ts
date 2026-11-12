@@ -30,7 +30,7 @@ import AutoAV from './addons/autoav';
 import LiveCaptions from './addons/live-captions';
 import YoutubeUploaderAddon from './addons/upload-helper';
 import AudienceDisplayAddon from './addons/audience-display';
-import FtcScorekeeper from './ftc/scorekeeper';
+import FtcScorekeeper from './addons/ftc-scorekeeper';
 import getVmixBandwidth, { streamKeyFromUrl } from './vmixBandwidth';
 import { AutoAVStatus } from '../models/AutoAVStatus';
 import { MatchRecord } from '../models/MatchRecord';
