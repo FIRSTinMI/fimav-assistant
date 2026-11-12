@@ -31,6 +31,7 @@ jest.mock('../main/addons/autoav', () => ({
         }),
         isFtc: () => true,
         runsCustomAd: () => false,
+        runsUploader: () => true,
     },
 }));
 jest.mock('../main/ftc/scorekeeper', () => ({
@@ -51,6 +52,16 @@ jest.mock('../main/addons/upload-helper', () => ({
             getPhase: () => 'running',
             getVersion: () => '0.1.11',
             eventKey: () => 'TEST',
+            // Queue counts from its event stream.
+            events: {
+                connected: true,
+                latest: new Map([
+                    [
+                        'queue',
+                        { type: 'queue', counts: { uploaded: 2, queued: 1 } },
+                    ],
+                ]),
+            },
         },
     },
 }));
@@ -89,21 +100,14 @@ const reply = (body: unknown) => ({
     json: async () => body,
 });
 
-// The uploader's state carries its settings, secrets included.
+// The status API must not read the uploader's event state (its config).
 const realFetch = global.fetch;
 global.fetch = jest.fn(async (url: any) => {
     const u = String(url);
     if (u.startsWith('http://127.0.0.1:8807/api/health'))
         return reply({ signed_in: true, channel_name: 'FIM', program: 'ftc' });
-    if (u.startsWith('http://127.0.0.1:8807/api/upload/state'))
-        return reply({
-            config: { tba_secret: 'TBASECRET', toa_api_key: 'TOAKEY' },
-            videos: {
-                a: { status: 'uploaded' },
-                b: { status: 'uploaded' },
-                c: { status: 'queued' },
-            },
-        });
+    if (u.startsWith('http://127.0.0.1:8807/api/upload/'))
+        throw new Error(`status API read ${u}`);
     if (u.startsWith('http://127.0.0.1:8888')) return reply('ok');
     return realFetch(url);
 }) as any;
@@ -218,9 +222,9 @@ describe('status API', () => {
             running: true,
             version: '0.1.11',
             signedIn: true,
+            selected: true,
             queue: { uploaded: 2, queued: 1 },
         });
-        expect(JSON.stringify(upload)).not.toMatch(/TBASECRET|TOAKEY/);
         expect((await get('/api/status/display')).body.selected).toBe(false);
         const companion = (await get('/api/status/companion')).body;
         expect(companion).toMatchObject({
