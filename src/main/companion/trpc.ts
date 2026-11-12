@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 
-// Companion 4.1 and later edit over tRPC (server v11) on ws://<host>/trpc,
+// Companion 5.x edits over tRPC (server v11) on ws://<host>/trpc,
 // with no transformer, so inputs and results are plain JSON. A Node client
 // sends no browser Origin, which Companion's Origin check lets through.
 

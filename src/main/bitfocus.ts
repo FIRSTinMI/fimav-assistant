@@ -15,14 +15,15 @@ import { getStore } from './store';
 
 // Bitfocus Companion + audience-display trigger access for the Bitfocus tab.
 //
-// Reading: Companion's full config export (GET /int/export/full) gives every
-// page, button and connection in one request, on every version from 3.0.
+// Reading: Companion's full config export (GET /int/export/full, gzipped JSON)
+// gives every page, button and connection in one request.
 //
 // Writing: Companion has no public API for editing buttons. Its own web UI
-// edits over socket.io (3.0 to 4.0) or tRPC (4.1 and later), and the calls
-// changed several times. companion/ holds one adapter per API generation,
-// picked by the running version and confirmed by a probe; a Companion no
-// adapter fits is shown read only. This runs in the main process because
+// edits over tRPC on ws://<host>/trpc, and this uses the same calls. The tab
+// supports Companion 5.0 and 5.1: companion/ holds an adapter for each,
+// picked by the running version and confirmed by a probe. Older versions, or
+// a newer one neither probe passes, are shown read only. This runs in the
+// main process because
 // Companion 5.x refuses a WebSocket whose browser Origin does not match its
 // own host, and a Node client sends no Origin.
 
@@ -70,52 +71,23 @@ function buttonActions(ctl: any): CompanionAction[] {
     }));
 }
 
-// Normal buttons are 'button' before Companion 5.0 and 'button-layered' from
-// 5.0; the tab treats both as one type.
-const normalType = (t: unknown) =>
-    t === 'button-layered' ? 'button' : String(t ?? '');
-
-const toButton = (ctl: any): CompanionButton => ({
-    type: normalType(ctl?.type),
-    text: buttonText(ctl),
-    actions: buttonActions(ctl),
-});
-
-// Companion 3.0 and 3.1 have a fixed 8 x 4 grid of numbered banks, and their
-// export keeps every control in one top-level map keyed "bank:<page>-<bank>"
-// (bank 1 is the top left, numbered across then down).
-export const BANK_COLUMNS = 8;
-const BANK_ROWS = 4;
-
-export function bankToLocation(bank: number) {
-    return {
-        row: Math.floor((bank - 1) / BANK_COLUMNS),
-        column: (bank - 1) % BANK_COLUMNS,
-    };
-}
-
+// The export's layout, for 5.x and, read only, for older Companions whose
+// export has the same per-page shape.
 export function parseCompanionExport(
     json: any
 ): Omit<CompanionLayout, 'version' | 'editable'> {
-    const bankControls: Record<string, Record<string, CompanionButton>> = {};
-    Object.entries(json.controls ?? {}).forEach(([id, ctl]) => {
-        const m = /^bank:(\d+)-(\d+)$/.exec(id);
-        if (!m) return;
-        const { row, column } = bankToLocation(Number(m[2]));
-        bankControls[m[1]] ??= {};
-        bankControls[m[1]][`${row}/${column}`] = toButton(ctl);
-    });
-
     const pages: CompanionPage[] = Object.entries(json.pages ?? {})
         .map(([num, p]: [string, any]) => {
-            const buttons: Record<string, CompanionButton> = {
-                ...bankControls[num],
-            };
+            const buttons: Record<string, CompanionButton> = {};
             Object.entries(p.controls ?? {}).forEach(
                 ([r, row]: [string, any]) =>
                     Object.entries(row ?? {}).forEach(
                         ([c, ctl]: [string, any]) => {
-                            buttons[`${r}/${c}`] = toButton(ctl);
+                            buttons[`${r}/${c}`] = {
+                                type: ctl?.type ?? '',
+                                text: buttonText(ctl),
+                                actions: buttonActions(ctl),
+                            };
                         }
                     )
             );
@@ -123,11 +95,8 @@ export function parseCompanionExport(
             return {
                 number: Number(num),
                 name: p.name ?? '',
-                rows: (grid.maxRow ?? BANK_ROWS - 1) - (grid.minRow ?? 0) + 1,
-                columns:
-                    (grid.maxColumn ?? BANK_COLUMNS - 1) -
-                    (grid.minColumn ?? 0) +
-                    1,
+                rows: (grid.maxRow ?? 3) - (grid.minRow ?? 0) + 1,
+                columns: (grid.maxColumn ?? 7) - (grid.minColumn ?? 0) + 1,
                 buttons,
             };
         })
@@ -149,8 +118,7 @@ export async function readCompanionExport(baseUrl: string): Promise<any> {
         signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) throw new Error(`Companion export: HTTP ${res.status}`);
-    // 3.2 and later gzip the body without a Content-Encoding header, so it
-    // arrives still compressed; 3.0 and 3.1 send plain JSON.
+    // Gzipped without a Content-Encoding header, so it arrives compressed.
     const raw = Buffer.from(await res.arrayBuffer());
     return JSON.parse(
         (raw[0] === 0x1f && raw[1] === 0x8b
@@ -193,7 +161,7 @@ export async function saveButtonWith(
     }
 
     const config = await ops.readButton(controlId);
-    if (config?.type !== 'button') {
+    if (config?.type !== 'button-layered') {
         throw new Error('Not an editable button');
     }
     const current = config.actions;
@@ -252,38 +220,22 @@ export async function saveButtonWith(
     }
 }
 
-// The adapter for the Companion at baseUrl, found once per Companion version:
-// the layout poll every few seconds re-reads the export (which carries the
-// version from 4.1), so detection runs again only when the version changes or
-// Companion stops answering.
-// Exports before 4.1 carry only a format number, which several versions
-// share, so the answer is also re-checked once a minute.
-const DETECT_TTL_MS = 60_000;
-
-let known: {
-    baseUrl: string;
-    build: string;
-    at: number;
-    info: CompanionInfo;
-} | null = null;
+// The adapter for the Companion at baseUrl, found once per Companion build:
+// the layout poll every few seconds re-reads the export, which carries the
+// build, so detection runs again only when the build changes or a call fails.
+let known: { baseUrl: string; build: string; info: CompanionInfo } | null =
+    null;
 
 export async function companionInfo(
     baseUrl: string,
     exportJson: any
 ): Promise<CompanionInfo> {
-    // 3.x and 4.0 exports carry no version; the export's format number
-    // stands in.
-    const build = String(exportJson?.companionBuild ?? exportJson?.version);
-    if (
-        known &&
-        known.baseUrl === baseUrl &&
-        known.build === build &&
-        Date.now() - known.at < DETECT_TTL_MS
-    ) {
+    const build = String(exportJson?.companionBuild ?? '');
+    if (known && known.baseUrl === baseUrl && known.build === build) {
         return known.info;
     }
     const info = await detectCompanion(baseUrl, exportJson);
-    known = { baseUrl, build, at: Date.now(), info };
+    known = { baseUrl, build, info };
     return info;
 }
 

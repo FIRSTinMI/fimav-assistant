@@ -78,7 +78,7 @@ const defFor = (a: CompanionAction) =>
 // A button the editor can change: a normal button whose press actions are all
 // in the catalog. Anything else is edited in Companion.
 const isEditable = (b: CompanionButton | undefined) =>
-    !b || (b.type === 'button' && b.actions.every((a) => defFor(a)));
+    !b || (b.type === 'button-layered' && b.actions.every((a) => defFor(a)));
 
 // Companion writes a line break in a label as the two characters "\\n".
 const labelToText = (label: string) => label.replace(/\\n/g, '\n');
