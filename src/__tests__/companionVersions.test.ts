@@ -15,21 +15,62 @@ import {
     pickTrpc,
     ProbeSession,
 } from '../main/companion/detect';
-import { TRPC_SHAPES } from '../main/companion/adapters';
+import {
+    CompanionOps,
+    configFromWatch,
+    pagesFromWatch,
+    replyShapeProblems,
+    TRPC_SHAPES,
+} from '../main/companion/adapters';
 import { PROBE_INPUT, TrpcSession } from '../main/companion/trpc';
-import { parseCompanionExport } from '../main/bitfocus';
+import { parseCompanionExport, saveButtonWith } from '../main/bitfocus';
 
 jest.mock('../main/store', () => ({ getStore: () => ({ get: () => 8888 }) }));
 
+type Watch = 'flat' | 'nested' | 'unknown';
+
+const BUTTON = {
+    type: 'button-layered',
+    style: { layers: [{ id: 'text0', type: 'text' }] },
+    steps: { '0': { action_sets: { down: [] } } },
+};
+
+// controls.watchControl's first value as 5.0/5.1 (flat), 5.2 (nested) or a
+// future release (unknown) send it
+function watchInit(watch: Watch, config: unknown = BUTTON) {
+    if (watch === 'flat') return { type: 'init', config, runtime: {} };
+    if (watch === 'nested') {
+        return {
+            type: 'init',
+            control: { type: 'button-layered', config, runtime: {} },
+        };
+    }
+    return { type: 'init', state: { config } };
+}
+
+const PAGES = {
+    type: 'init',
+    order: ['p1'],
+    pages: { p1: { controls: { '0': { '0': 'bank:a' } } } },
+};
+
 // A Companion whose tRPC router has exactly these procedures. has() answers
-// the way detect.ts reads a real probe: false only for NOT_FOUND.
-function fakeProbe(procedures: string[]): ProbeSession & { asked: string[] } {
+// the way detect.ts reads a real probe: false only for NOT_FOUND. first()
+// answers subscriptions in the given reply shape.
+function fakeProbe(
+    procedures: string[],
+    watch: Watch = 'flat',
+    config: unknown = BUTTON
+): ProbeSession & { asked: string[] } {
     const asked: string[] = [];
     return {
         asked,
         async has(kind, path) {
             asked.push(`${kind} ${path}`);
             return procedures.includes(`${kind} ${path}`);
+        },
+        async first(path) {
+            return path === 'pages.watch' ? PAGES : watchInit(watch, config);
         },
         close() {},
     };
@@ -64,7 +105,7 @@ describe('Companion version parsing', () => {
         expect(parseVersion(42)).toBeNull();
     });
 
-    it('maps versions to the 5.0 and 5.1 adapters', () => {
+    it('maps versions to the 5.0, 5.1 and 5.2 adapters', () => {
         const cases: [string, Generation | null][] = [
             // before 5.0: no adapter, read only
             ['3.0.1', null],
@@ -74,9 +115,11 @@ describe('Companion version parsing', () => {
             ['5.0.7', 'trpc-5.0'],
             ['5.1.0', 'trpc-5.1'],
             ['5.1.2', 'trpc-5.1'],
-            // newer than 5.1: the 5.1 adapter, confirmed by the probe
-            ['5.2.0', 'trpc-5.1'],
-            ['6.0.0', 'trpc-5.1'],
+            ['5.1.3', 'trpc-5.1'],
+            ['5.2.0', 'trpc-5.2'],
+            // newer than 5.2: the 5.2 adapter, confirmed by probe and shapes
+            ['5.3.0', 'trpc-5.2'],
+            ['6.0.0', 'trpc-5.2'],
         ];
         cases.forEach(([v, g]) =>
             expect([v, generationFor(parseVersion(v)!)]).toEqual([v, g])
@@ -261,5 +304,135 @@ describe('untested versions', () => {
         const v = parseVersion(raw);
         expect(v).not.toBeNull();
         expect(isUntested(v!)).toBe(untested);
+    });
+});
+
+describe('reply shapes', () => {
+    it('reads each version’s watchControl first value', () => {
+        expect(
+            configFromWatch(TRPC_SHAPES['trpc-5.1'], watchInit('flat'))
+        ).toEqual(BUTTON);
+        expect(
+            configFromWatch(TRPC_SHAPES['trpc-5.2'], watchInit('nested'))
+        ).toEqual(BUTTON);
+        // each adapter refuses the other's shape and anything new
+        expect(
+            configFromWatch(TRPC_SHAPES['trpc-5.1'], watchInit('nested'))
+        ).toBeNull();
+        expect(
+            configFromWatch(TRPC_SHAPES['trpc-5.2'], watchInit('flat'))
+        ).toBeNull();
+        expect(
+            configFromWatch(TRPC_SHAPES['trpc-5.2'], watchInit('unknown'))
+        ).toBeNull();
+        expect(pagesFromWatch(PAGES)).not.toBeNull();
+        expect(pagesFromWatch({ type: 'init', pages: [] })).toBeNull();
+    });
+
+    it('passes the shapes the adapter knows', async () => {
+        const router = routerOf('trpc-5.2');
+        expect(
+            await replyShapeProblems(fakeProbe(router, 'nested'), 'trpc-5.2')
+        ).toEqual([]);
+        expect(
+            await replyShapeProblems(fakeProbe(router, 'flat'), 'trpc-5.1')
+        ).toEqual([]);
+    });
+
+    it('names a reply the adapter does not know', async () => {
+        const router = routerOf('trpc-5.2');
+        expect(
+            await replyShapeProblems(fakeProbe(router, 'unknown'), 'trpc-5.2')
+        ).toEqual(['controls.watchControl reply']);
+        // a normal button without a text layer
+        expect(
+            await replyShapeProblems(
+                fakeProbe(router, 'nested', { ...BUTTON, style: {} }),
+                'trpc-5.2'
+            )
+        ).toEqual(['controls.watchControl button config']);
+        // pages in a new shape
+        const s = fakeProbe(router, 'nested');
+        s.first = async () => ({ type: 'init', pageList: [] });
+        expect(await replyShapeProblems(s, 'trpc-5.2')).toEqual([
+            'pages.watch reply',
+        ]);
+    });
+
+    it('a 5.2 with an unknown reply is read only', async () => {
+        const s = fakeProbe(routerOf('trpc-5.2'), 'unknown');
+        expect(await pickTrpc(s, 'trpc-5.2', true)).toEqual({
+            generation: null,
+            missing: ['controls.watchControl reply'],
+        });
+    });
+
+    it('tells 5.1 and 5.2 apart by reply, as they share every name', async () => {
+        // 5.0 version on a router with 5.1's names: falls back past 5.2,
+        // whose shape does not fit, to 5.1
+        expect(
+            (
+                await pickTrpc(
+                    fakeProbe(routerOf('trpc-5.1'), 'flat'),
+                    'trpc-5.0'
+                )
+            ).generation
+        ).toBe('trpc-5.1');
+        expect(
+            (
+                await pickTrpc(
+                    fakeProbe(routerOf('trpc-5.1'), 'nested'),
+                    'trpc-5.0'
+                )
+            ).generation
+        ).toBe('trpc-5.2');
+    });
+});
+
+describe('saving a new button', () => {
+    // A Companion where the cell is empty, creating works, and reading the
+    // new button back fails the way a changed reply would.
+    function fakeOps(): CompanionOps & { cells: Set<string> } {
+        const cells = new Set<string>();
+        const at = (p: number, r: number, c: number) => `${p}/${r}/${c}`;
+        return {
+            cells,
+            generation: 'trpc-5.2',
+            async controlIdAt(p, r, c) {
+                return cells.has(at(p, r, c)) ? `bank:${at(p, r, c)}` : null;
+            },
+            async createButton(p, r, c) {
+                cells.add(at(p, r, c));
+            },
+            async readButton() {
+                throw new Error(
+                    'Companion: controls.watchControl reply not understood'
+                );
+            },
+            setText: async () => undefined,
+            async addAction() {
+                return 'a1';
+            },
+            setOption: async () => undefined,
+            removeAction: async () => undefined,
+            async clearButton(p, r, c) {
+                cells.delete(at(p, r, c));
+            },
+            close() {},
+        };
+    }
+
+    it('removes the button it made when the rest of the save fails', async () => {
+        const ops = fakeOps();
+        await expect(
+            saveButtonWith(ops, {
+                page: 1,
+                row: 0,
+                column: 3,
+                text: 'X',
+                actions: [],
+            })
+        ).rejects.toThrow('controls.watchControl reply not understood');
+        expect(ops.cells.size).toBe(0);
     });
 });

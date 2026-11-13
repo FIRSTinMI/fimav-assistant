@@ -27,12 +27,12 @@ function isUntestedRaw(raw: string): boolean {
 //
 // Writing: Companion has no public API for editing buttons. Its own web UI
 // edits over tRPC on ws://<host>/trpc, and this uses the same calls. The tab
-// supports Companion 5.0 and 5.1: companion/ holds an adapter for each,
-// picked by the running version and confirmed by a probe. Older versions, or
-// a newer one neither probe passes, are shown read only. This runs in the
-// main process because
-// Companion 5.x refuses a WebSocket whose browser Origin does not match its
-// own host, and a Node client sends no Origin.
+// supports Companion 5.0, 5.1 and 5.2: companion/ holds an adapter for each,
+// picked by the running version and confirmed by a probe (and, above the
+// newest tested release, a read-only check of reply shapes). Older versions,
+// or a newer one no adapter fits, are shown read only. This runs in the main
+// process because Companion 5.x refuses a WebSocket whose browser Origin does
+// not match its own host, and a Node client sends no Origin.
 
 const FMS_URL = 'http://10.0.100.5';
 
@@ -160,13 +160,29 @@ export async function saveButtonWith(
     ops: CompanionOps,
     edit: ButtonEdit
 ): Promise<void> {
-    let controlId = await ops.controlIdAt(edit.page, edit.row, edit.column);
-    if (!controlId) {
-        await ops.createButton(edit.page, edit.row, edit.column);
-        controlId = await ops.controlIdAt(edit.page, edit.row, edit.column);
-        if (!controlId) throw new Error('Companion did not create the button');
+    const existing = await ops.controlIdAt(edit.page, edit.row, edit.column);
+    if (existing) {
+        await editButton(ops, existing, edit);
+        return;
     }
+    // A button made here is removed again if the rest of the save fails, so
+    // a failed save never leaves an empty button behind.
+    await ops.createButton(edit.page, edit.row, edit.column);
+    try {
+        const created = await ops.controlIdAt(edit.page, edit.row, edit.column);
+        if (!created) throw new Error('Companion did not create the button');
+        await editButton(ops, created, edit);
+    } catch (e) {
+        await ops.clearButton(edit.page, edit.row, edit.column).catch(() => {});
+        throw e;
+    }
+}
 
+async function editButton(
+    ops: CompanionOps,
+    controlId: string,
+    edit: ButtonEdit
+): Promise<void> {
     const config = await ops.readButton(controlId);
     if (config?.type !== 'button-layered') {
         throw new Error('Not an editable button');

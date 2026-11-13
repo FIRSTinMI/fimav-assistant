@@ -1,24 +1,28 @@
-import { TRPC_SHAPES } from './adapters';
+import { replyShapeProblems, TRPC_SHAPES } from './adapters';
 import { TrpcSession } from './trpc';
-import { Generation, generationFor, parseVersion } from './version';
+import { Generation, generationFor, isUntested, parseVersion } from './version';
 
 // Which Companion is on the other end, and which adapter edits it.
 //
 // The version comes from the full export's companionBuild. It picks an
 // adapter; a probe then checks that every procedure the adapter calls exists,
-// so a release that renamed one shows up as read only rather than failing
-// halfway through a save.
+// and, for a version newer than the newest tested one, a read-only look at
+// the replies checks their shape. A release that renamed a call or changed a
+// reply shows up as read only rather than failing halfway through a save.
 
 export interface CompanionInfo {
     version: string;
     // null: no adapter fits, the layout is read only
     generation: Generation | null;
-    // Procedures the version's own adapter needs and this Companion lacks
+    // Procedures the version's own adapter needs and this Companion lacks,
+    // or replies it reads that came back in a shape it does not know
     missing: string[];
 }
 
 export interface ProbeSession {
     has(_kind: 'mutation' | 'subscription', _path: string): Promise<boolean>;
+    // First value of a subscription, for the reply-shape check
+    first(_path: string, _input: unknown): Promise<any>;
     close(): void;
 }
 
@@ -45,22 +49,36 @@ export async function missingProcedures(
 // Newest first: the order the other adapter is tried in.
 const TRPC_ORDER = (Object.keys(TRPC_SHAPES) as Generation[]).reverse();
 
-// Pick the adapter: the version's own if its probe passes, else the other
-// one if its probe passes (a patch release that moved a call back or
-// forward), else none.
+// Pick the adapter: the version's own if its probe passes, else another
+// whose probe passes (a patch release that moved a call back or forward),
+// else none. Two adapters can share every procedure name (5.1 and 5.2), so
+// any adapter other than the version's own must also pass the reply-shape
+// check, and so must the version's own when the version is newer than the
+// newest tested one.
 export async function pickTrpc(
     s: ProbeSession,
-    wanted: Generation | null
+    wanted: Generation | null,
+    checkOwnShapes = false
 ): Promise<{ generation: Generation | null; missing: string[] }> {
     const own = wanted;
-    const ownMissing = own ? await missingProcedures(s, own) : [];
-    if (own && !ownMissing.length) return { generation: own, missing: [] };
+    let ownMissing: string[] = [];
+    if (own) {
+        ownMissing = await missingProcedures(s, own);
+        if (!ownMissing.length && checkOwnShapes) {
+            ownMissing = await replyShapeProblems(s, own);
+        }
+        if (!ownMissing.length) return { generation: own, missing: [] };
+    }
     // eslint-disable-next-line no-restricted-syntax
     for (const g of TRPC_ORDER) {
         // eslint-disable-next-line no-continue
         if (g === own) continue;
-        // eslint-disable-next-line no-await-in-loop
-        if (!(await missingProcedures(s, g)).length) {
+        if (
+            // eslint-disable-next-line no-await-in-loop
+            !(await missingProcedures(s, g)).length &&
+            // eslint-disable-next-line no-await-in-loop
+            !(await replyShapeProblems(s, g)).length
+        ) {
             return { generation: g, missing: ownMissing };
         }
     }
@@ -85,7 +103,11 @@ export async function detectCompanion(
     let s: TrpcSession | null = null;
     try {
         s = await TrpcSession.open(baseUrl);
-        return { version: raw, ...(await pickTrpc(s, wanted)) };
+        // Above the newest tested release, also check the replies the
+        // adapter reads, so a release that kept a name but changed its answer
+        // is read only instead of failing halfway through a save.
+        const picked = await pickTrpc(s, wanted, isUntested(version!));
+        return { version: raw, ...picked };
     } catch {
         return { version: raw, generation: null, missing: [] };
     } finally {
