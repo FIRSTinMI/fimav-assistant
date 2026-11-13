@@ -42,10 +42,10 @@ export interface CompanionLayout {
     connections: CompanionConnection[];
     // Version Companion reported, '' when it could not be read
     version: string;
-    // Companion is 5.0 or 5.1 (or newer with the same calls). When false the
-    // layout is still shown, read only.
+    // Companion is 5.0 to 5.2 (or newer with the same calls and replies).
+    // When false the layout is still shown, read only.
     editable: boolean;
-    // Editable, but newer than the newest release tested (5.1.2)
+    // Editable, but newer than the newest release tested (version.ts)
     untested: boolean;
 }
 

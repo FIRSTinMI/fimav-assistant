@@ -10,10 +10,39 @@ jest.mock('../main/companion/trpc', () => ({
 
 const trpcOpen = TrpcSession.open as jest.Mock;
 
-function fakeTrpc(router: string[]) {
+const BUTTON = {
+    type: 'button-layered',
+    style: { layers: [{ id: 'text0', type: 'text' }] },
+    steps: { '0': { action_sets: { down: [] } } },
+};
+
+// controls.watchControl's first value: 5.0/5.1 (flat), 5.2 (nested), or a
+// shape no adapter knows
+const WATCH = {
+    flat: { type: 'init', config: BUTTON, runtime: {} },
+    nested: {
+        type: 'init',
+        control: { type: 'button-layered', config: BUTTON, runtime: {} },
+    },
+    unknown: { type: 'init', state: { config: BUTTON } },
+};
+
+const first = jest.fn();
+
+function fakeTrpc(router: string[], watch: keyof typeof WATCH = 'flat') {
+    first.mockImplementation(async (path: string) =>
+        path === 'pages.watch'
+            ? {
+                  type: 'init',
+                  order: ['p1'],
+                  pages: { p1: { controls: { '0': { '0': 'bank:a' } } } },
+              }
+            : WATCH[watch]
+    );
     trpcOpen.mockResolvedValue({
         has: async (kind: string, path: string) =>
             router.includes(`${kind} ${path}`),
+        first,
         close: () => {},
     });
 }
@@ -23,7 +52,10 @@ const routerOf = (g: Generation) => [
     ...TRPC_SHAPES[g].subscriptions.map((p) => `subscription ${p}`),
 ];
 
-beforeEach(() => trpcOpen.mockReset());
+beforeEach(() => {
+    trpcOpen.mockReset();
+    first.mockReset();
+});
 
 describe('detectCompanion', () => {
     it('5.0 gets the 5.0 adapter', async () => {
@@ -62,26 +94,52 @@ describe('detectCompanion', () => {
         expect(trpcOpen).not.toHaveBeenCalled();
     });
 
-    it('a newer version with the 5.1 calls gets the 5.1 adapter', async () => {
+    it('a tested version is not shape-checked', async () => {
         fakeTrpc(routerOf('trpc-5.1'));
         const info = await detectCompanion('http://c', {
-            companionBuild: '5.2.0+11000-stable-0',
+            companionBuild: '5.1.3+10036-stable-93ea3fa61c',
         });
         expect(info.generation).toBe('trpc-5.1');
+        expect(first).not.toHaveBeenCalled();
+    });
+
+    it('5.2 gets the 5.2 adapter once its replies are checked', async () => {
+        fakeTrpc(routerOf('trpc-5.2'), 'nested');
+        const info = await detectCompanion('http://c', {
+            companionBuild: '5.2.0+10262-main-ea722db1e6',
+        });
+        expect(info.generation).toBe('trpc-5.2');
+        expect(first).toHaveBeenCalledWith('controls.watchControl', {
+            controlId: 'bank:a',
+        });
+    });
+
+    it('a newer version with a reply no adapter knows is read only', async () => {
+        fakeTrpc(routerOf('trpc-5.2'), 'unknown');
+        expect(
+            await detectCompanion('http://c', {
+                companionBuild: '5.3.0+11000-stable-0',
+            })
+        ).toEqual({
+            version: '5.3.0+11000-stable-0',
+            generation: null,
+            missing: ['controls.watchControl reply'],
+        });
     });
 
     it('a newer version that renamed a call is read only', async () => {
         fakeTrpc(
-            routerOf('trpc-5.1').filter(
+            routerOf('trpc-5.2').filter(
                 (p) => p !== 'mutation controls.styles.updateOption'
-            )
+            ),
+            'nested'
         );
         expect(
             await detectCompanion('http://c', {
-                companionBuild: '5.2.0+11000-stable-0',
+                companionBuild: '5.3.0+11000-stable-0',
             })
         ).toEqual({
-            version: '5.2.0+11000-stable-0',
+            version: '5.3.0+11000-stable-0',
             generation: null,
             missing: ['controls.styles.updateOption'],
         });

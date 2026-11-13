@@ -1,7 +1,8 @@
-// The Bitfocus tab edits Companion 5.0 and 5.1. Their editing calls differ in
-// one procedure, so each has an adapter; the running version picks one and a
-// probe of the calls it needs confirms it (see adapters.ts). Anything older,
-// or a newer release whose calls changed, is shown read only.
+// The Bitfocus tab edits Companion 5.0, 5.1 and 5.2. Their editing calls
+// differ a little, so each has an adapter; the running version picks one and
+// a probe of the calls it needs confirms it (see adapters.ts). Anything
+// older, or a newer release whose calls or replies changed, is shown read
+// only.
 
 export interface CompanionVersion {
     major: number;
@@ -11,7 +12,7 @@ export interface CompanionVersion {
     raw: string;
 }
 
-export type Generation = 'trpc-5.0' | 'trpc-5.1';
+export type Generation = 'trpc-5.0' | 'trpc-5.1' | 'trpc-5.2';
 
 // "5.1.2", "v5.1.2", "5.1.2+10019-stable-98d5d4e1a1", "5.1.0-beta.3"
 export function parseVersion(raw: unknown): CompanionVersion | null {
@@ -30,8 +31,9 @@ const at = (v: CompanionVersion, major: number, minor: number) =>
     v.major > major || (v.major === major && v.minor >= minor);
 
 // Newest release the adapters were tested against end to end. A newer one
-// still edits when its probe passes, but the tab marks it untested.
-const NEWEST_TESTED = { major: 5, minor: 1, patch: 2 };
+// (5.2 until a stable 5.2 is out) still edits when its probe and reply-shape
+// check pass, but the tab marks it untested.
+const NEWEST_TESTED = { major: 5, minor: 1, patch: 3 };
 
 export function isUntested(v: CompanionVersion): boolean {
     const t = NEWEST_TESTED;
@@ -41,9 +43,11 @@ export function isUntested(v: CompanionVersion): boolean {
 }
 
 // The adapter written for this version, or null before 5.0. A version newer
-// than 5.1 maps to the 5.1 adapter; the probe then decides whether it fits.
+// than 5.2 maps to the 5.2 adapter; the probe and the reply-shape check then
+// decide whether it fits.
 export function generationFor(v: CompanionVersion): Generation | null {
     if (!at(v, 5, 0)) return null;
     if (!at(v, 5, 1)) return 'trpc-5.0';
-    return 'trpc-5.1';
+    if (!at(v, 5, 2)) return 'trpc-5.1';
+    return 'trpc-5.2';
 }
