@@ -251,8 +251,11 @@ describe('untested versions', () => {
         ['5.0.7', false],
         ['5.1.2', false],
         ['5.1.2+10019-stable-98d5d4e1a1', false],
-        ['5.1.3', true],
+        ['5.1.3', false],
+        ['5.1.3+10036-stable-93ea3fa61c', false],
+        ['5.1.4', true],
         ['5.2.0', true],
+        ['5.2.0-beta.1', true],
         ['6.0.0', true],
     ])('%s untested=%s', (raw, untested) => {
         const v = parseVersion(raw);

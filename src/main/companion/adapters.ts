@@ -5,8 +5,8 @@ import { Generation } from './version';
 // replaced controls.resetControl with controls.resetControls (a list of
 // locations), which a 5.0 client hits as "mutation does not exist". Each
 // version gets an adapter with the calls it has, written from Companion's
-// routers at v5.0.7 and v5.1.2. The save logic (bitfocus.ts) is shared and
-// only sees the operations below.
+// routers at v5.0.7 and v5.1.2 (unchanged in v5.1.3). The save logic
+// (bitfocus.ts) is shared and only sees the operations below.
 
 export interface DownAction {
     id: string;

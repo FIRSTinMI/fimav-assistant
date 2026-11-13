@@ -31,7 +31,7 @@ const at = (v: CompanionVersion, major: number, minor: number) =>
 
 // Newest release the adapters were tested against end to end. A newer one
 // still edits when its probe passes, but the tab marks it untested.
-const NEWEST_TESTED = { major: 5, minor: 1, patch: 2 };
+const NEWEST_TESTED = { major: 5, minor: 1, patch: 3 };
 
 export function isUntested(v: CompanionVersion): boolean {
     const t = NEWEST_TESTED;
