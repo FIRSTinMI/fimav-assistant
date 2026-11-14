@@ -6,6 +6,7 @@ import {
     openOps,
 } from './companion/adapters';
 import { CompanionInfo, detectCompanion } from './companion/detect';
+import { TrpcSession } from './companion/trpc';
 import { isUntested, parseVersion } from './companion/version';
 import {
     CompanionAction,
@@ -255,7 +256,10 @@ async function editButton(
     if (currentFeedbacks.some((f) => !editableFeedback(f))) {
         throw new Error('Button has feedbacks only Companion can edit');
     }
-    if (edit.feedbacks.some((f) => f.bgColor !== undefined) && !config.boxLayerId) {
+    if (
+        edit.feedbacks.some((f) => f.bgColor !== undefined) &&
+        !config.boxLayerId
+    ) {
         throw new Error('Button has no background layer');
     }
 
@@ -443,6 +447,58 @@ export async function readCompanionLayout(
         editable: !!info.generation,
         untested: !!info.generation && isUntestedRaw(info.version),
     };
+}
+
+// #endregion
+
+// #region Live preview
+
+// Companion's own `preview.graphics.location` subscription: the fully
+// rendered button (feedbacks and all) as a `data:image/png;base64,...`
+// string, re-sent whenever that button's look changes. A separate,
+// long-lived tRPC session from the one editing uses (that one opens and
+// closes around a single read/write; this one stays open as long as the
+// grid is on screen), kept across calls so changing pages does not pay
+// for a new WebSocket handshake every time.
+let previewSession: TrpcSession | null = null;
+let previewSessionUrl = '';
+const previewStops = new Map<string, () => void>();
+
+async function previewSessionFor(baseUrl: string): Promise<TrpcSession> {
+    if (previewSession && previewSessionUrl === baseUrl) return previewSession;
+    previewSession?.close();
+    previewStops.clear();
+    previewSessionUrl = baseUrl;
+    previewSession = await TrpcSession.open(baseUrl);
+    return previewSession;
+}
+
+// Replaces whatever was being watched (a page change watches a whole new
+// set of cells) with a subscription per cell; `onImage` fires for every
+// image Companion sends, including the first.
+export async function watchButtonPreviews(
+    baseUrl: string,
+    page: number,
+    cells: { row: number; column: number }[],
+    onImage: (_row: number, _column: number, _image: string | null) => void
+): Promise<void> {
+    stopButtonPreviews();
+    const session = await previewSessionFor(baseUrl);
+    cells.forEach(({ row, column }) => {
+        const stop = session.subscribe(
+            'preview.graphics.location',
+            { location: { pageNumber: page, row, column } },
+            (data: { image: string | null } | null) =>
+                onImage(row, column, data?.image ?? null),
+            () => onImage(row, column, null)
+        );
+        previewStops.set(`${row}/${column}`, stop);
+    });
+}
+
+export function stopButtonPreviews(): void {
+    previewStops.forEach((stop) => stop());
+    previewStops.clear();
 }
 
 // #endregion
