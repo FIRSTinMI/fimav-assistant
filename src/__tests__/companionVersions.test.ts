@@ -415,6 +415,12 @@ describe('saving a new button', () => {
             },
             setOption: async () => undefined,
             removeAction: async () => undefined,
+            async addFeedback() {
+                return 'f1';
+            },
+            setFeedbackOption: async () => undefined,
+            removeFeedback: async () => undefined,
+            setFeedbackColor: async () => undefined,
             async clearButton(p, r, c) {
                 cells.delete(at(p, r, c));
             },
@@ -431,6 +437,7 @@ describe('saving a new button', () => {
                 column: 3,
                 text: 'X',
                 actions: [],
+                feedbacks: [],
             })
         ).rejects.toThrow('controls.watchControl reply not understood');
         expect(ops.cells.size).toBe(0);

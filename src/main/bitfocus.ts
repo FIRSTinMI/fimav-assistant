@@ -1,5 +1,10 @@
 import zlib from 'zlib';
-import { CompanionOps, DownAction, openOps } from './companion/adapters';
+import {
+    CompanionOps,
+    DownAction,
+    DownFeedback,
+    openOps,
+} from './companion/adapters';
 import { CompanionInfo, detectCompanion } from './companion/detect';
 import { isUntested, parseVersion } from './companion/version';
 import {
@@ -11,6 +16,7 @@ import {
     CustomAdState,
     FmsAutomationConfig,
     matchActionDef,
+    matchFeedbackDef,
 } from '../models/Bitfocus';
 import { getStore } from './store';
 
@@ -78,6 +84,34 @@ function buttonActions(ctl: any): CompanionAction[] {
     }));
 }
 
+// Feedbacks live in their own flat list on the control, not nested in a
+// step/action-set like actions - same per-entry shape otherwise, plus the
+// one style override this editor writes (a flat background color on the
+// button's box layer; see adapters.ts's BG_OVERRIDE_ID).
+const BG_OVERRIDE_ID = 'bg';
+
+function buttonFeedbacks(ctl: any): CompanionAction[] {
+    const feedbacks: any[] = ctl?.feedbacks ?? [];
+    return feedbacks.map((f) => {
+        const override = (f.styleOverrides ?? []).find(
+            (o: any) => o?.overrideId === BG_OVERRIDE_ID
+        );
+        const bgColor = plain(override?.override);
+        return {
+            id: f.id,
+            definitionId: f.definitionId ?? f.feedbackId,
+            connectionId: f.connectionId ?? f.instance,
+            options: Object.fromEntries(
+                Object.entries(f.options ?? {}).map(([k, v]) => [k, plain(v)])
+            ),
+            hasExpression: Object.values(f.options ?? {}).some(
+                (v: any) => v?.isExpression === true
+            ),
+            bgColor: typeof bgColor === 'number' ? bgColor : undefined,
+        };
+    });
+}
+
 // The export's layout, for 5.x and, read only, for older Companions whose
 // export has the same per-page shape.
 export function parseCompanionExport(
@@ -94,6 +128,7 @@ export function parseCompanionExport(
                                 type: ctl?.type ?? '',
                                 text: buttonText(ctl),
                                 actions: buttonActions(ctl),
+                                feedbacks: buttonFeedbacks(ctl),
                             };
                         }
                     )
@@ -150,6 +185,14 @@ export interface ButtonEdit {
         connectionId: string;
         options: Record<string, unknown>;
     }[];
+    // Same shape, plus the one style override every feedback can carry:
+    // a flat background color, set the same way regardless of feedback type.
+    feedbacks: {
+        definitionId: string;
+        connectionId: string;
+        options: Record<string, unknown>;
+        bgColor?: number;
+    }[];
 }
 
 // Write one button: create it if the cell is empty, set its label, and replace
@@ -200,6 +243,22 @@ async function editButton(
         throw new Error('Button has actions only Companion can edit');
     }
 
+    const currentFeedbacks = config.feedbacks;
+    const editableFeedback = (f: DownFeedback) =>
+        !Object.values(f.options).some((v: any) => v?.isExpression === true) &&
+        matchFeedbackDef(
+            f.definitionId,
+            Object.fromEntries(
+                Object.entries(f.options).map(([k, v]) => [k, plain(v)])
+            )
+        );
+    if (currentFeedbacks.some((f) => !editableFeedback(f))) {
+        throw new Error('Button has feedbacks only Companion can edit');
+    }
+    if (edit.feedbacks.some((f) => f.bgColor !== undefined) && !config.boxLayerId) {
+        throw new Error('Button has no background layer');
+    }
+
     await ops.setText(controlId, config, edit.text);
 
     // Replace the press actions. The new list is added first (add appends,
@@ -240,6 +299,51 @@ async function editButton(
     for (const a of current) {
         // eslint-disable-next-line no-await-in-loop
         await ops.removeAction(controlId, a.id);
+    }
+
+    // Same replace-then-remove-old shape as actions above.
+    const addedFeedbacks: string[] = [];
+    try {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const f of edit.feedbacks) {
+            // eslint-disable-next-line no-await-in-loop
+            const feedbackId = await ops.addFeedback(
+                controlId,
+                f.connectionId,
+                f.definitionId
+            );
+            addedFeedbacks.push(feedbackId);
+            // eslint-disable-next-line no-restricted-syntax
+            for (const [key, v] of Object.entries(f.options)) {
+                // eslint-disable-next-line no-await-in-loop
+                await ops.setFeedbackOption(controlId, feedbackId, key, v);
+            }
+            if (f.bgColor !== undefined) {
+                // eslint-disable-next-line no-await-in-loop
+                await ops.setFeedbackColor(
+                    controlId,
+                    feedbackId,
+                    config.boxLayerId as string,
+                    f.bgColor
+                );
+            }
+        }
+    } catch (e) {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const feedbackId of addedFeedbacks) {
+            try {
+                // eslint-disable-next-line no-await-in-loop
+                await ops.removeFeedback(controlId, feedbackId);
+            } catch {
+                // best effort; the original error is what is reported
+            }
+        }
+        throw e;
+    }
+    // eslint-disable-next-line no-restricted-syntax
+    for (const f of currentFeedbacks) {
+        // eslint-disable-next-line no-await-in-loop
+        await ops.removeFeedback(controlId, f.id);
     }
 }
 

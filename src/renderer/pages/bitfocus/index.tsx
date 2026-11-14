@@ -3,6 +3,7 @@ import {
     AutoComplete,
     Button,
     Card,
+    ColorPicker,
     Empty,
     Form,
     Input,
@@ -20,6 +21,7 @@ import {
 } from 'antd';
 import {
     DeleteOutlined,
+    EditOutlined,
     ExportOutlined,
     PlusOutlined,
     ReloadOutlined,
@@ -34,9 +36,11 @@ import {
     CompanionPage,
     CustomAdConfig,
     CustomAdState,
+    FEEDBACK_DEFS,
     FMS_BITFOCUS_EVENTS,
     FmsAutomationConfig,
     matchActionDef,
+    matchFeedbackDef,
     migrateLegacyOverlayOptions,
 } from '../../../models/Bitfocus';
 import {
@@ -76,10 +80,16 @@ const send = (channel: string, ...args: unknown[]) =>
 const defFor = (a: CompanionAction) =>
     a.hasExpression ? undefined : matchActionDef(a.definitionId, a.options);
 
-// A button the editor can change: a normal button whose press actions are all
-// in the catalog. Anything else is edited in Companion.
+const defFeedbackFor = (f: CompanionAction) =>
+    f.hasExpression ? undefined : matchFeedbackDef(f.definitionId, f.options);
+
+// A button the editor can change: a normal button whose press actions and
+// feedbacks are all in the catalog. Anything else is edited in Companion.
 const isEditable = (b: CompanionButton | undefined) =>
-    !b || (b.type === 'button-layered' && b.actions.every((a) => defFor(a)));
+    !b ||
+    (b.type === 'button-layered' &&
+        b.actions.every((a) => defFor(a)) &&
+        b.feedbacks.every((f) => defFeedbackFor(f)));
 
 // Companion writes a line break in a label as the two characters "\\n".
 const labelToText = (label: string) => label.replace(/\\n/g, '\n');
@@ -291,6 +301,161 @@ function ActionRow({
     );
 }
 
+interface EditFeedback {
+    key: string; // FEEDBACK_DEFS key
+    options: Record<string, unknown>;
+    // undefined = no background override set; Companion's own default style
+    // (or whatever was set directly in Companion) stands.
+    bgColor?: number;
+}
+
+const colorToHex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
+const hexToColor = (hex: string) => parseInt(hex.slice(1, 7), 16) || 0;
+const DEFAULT_BG_COLOR = 0x00aa00;
+
+const BG_COLOR_PRESETS = [
+    {
+        label: 'Presets',
+        colors: [
+            '#00aa00',
+            '#cc0000',
+            '#0066cc',
+            '#cccc00',
+            '#cc6600',
+            '#6a1b9a',
+            '#ffffff',
+            '#000000',
+        ],
+    },
+];
+
+function FeedbackRow({
+    feedback,
+    groups,
+    vmixInputs,
+    onChange,
+    onRemove,
+}: {
+    feedback: EditFeedback;
+    groups: ActionGroup[];
+    vmixInputs: string[];
+    onChange: (_f: EditFeedback) => void;
+    onRemove: () => void;
+}) {
+    const def = FEEDBACK_DEFS.find((d) => d.key === feedback.key);
+    const setOpt = (k: string, v: unknown) =>
+        onChange({ ...feedback, options: { ...feedback.options, [k]: v } });
+    // See ActionRow's comment: AutoComplete's `searchValue` is ignored in its
+    // always-on combobox mode, so filtering is suppressed via this flag
+    // instead, right after a pick.
+    const [justPicked, setJustPicked] = useState<Record<string, boolean>>({});
+    return (
+        <div className="bf-action">
+            <Select
+                style={{ width: 170, flex: 'none' }}
+                showSearch
+                optionFilterProp="label"
+                popupMatchSelectWidth={220}
+                value={feedback.key}
+                options={groups}
+                onChange={(key) => onChange({ key, options: {} })}
+            />
+            {def?.fields.map((f) => {
+                const v = feedback.options[f.key];
+                if (f.type === 'vmixInput') {
+                    const missing =
+                        !!v &&
+                        vmixInputs.length > 0 &&
+                        !vmixInputs.includes(v as string);
+                    return (
+                        <Tooltip
+                            key={f.key}
+                            title={missing ? 'Unknown vMix input' : undefined}
+                        >
+                            <AutoComplete
+                                style={{ flex: 1, minWidth: 0 }}
+                                status={missing ? 'error' : undefined}
+                                placeholder={f.label}
+                                value={(v as string) ?? ''}
+                                onSearch={() =>
+                                    setJustPicked((prev) =>
+                                        prev[f.key]
+                                            ? { ...prev, [f.key]: false }
+                                            : prev
+                                    )
+                                }
+                                options={vmixInputs.map((i) => ({ value: i }))}
+                                filterOption={(input, o) =>
+                                    justPicked[f.key] ||
+                                    String(o?.value ?? '')
+                                        .toLowerCase()
+                                        .includes(input.toLowerCase())
+                                }
+                                onChange={(x) => {
+                                    setOpt(f.key, x);
+                                    setJustPicked((prev) => ({
+                                        ...prev,
+                                        [f.key]: true,
+                                    }));
+                                }}
+                            />
+                        </Tooltip>
+                    );
+                }
+                if (f.type === 'select') {
+                    return (
+                        <Select
+                            key={f.key}
+                            style={{ width: 170, flex: 'none' }}
+                            placeholder={f.label}
+                            value={v as string | undefined}
+                            options={f.options}
+                            onChange={(x) => setOpt(f.key, x)}
+                        />
+                    );
+                }
+                return (
+                    <InputNumber
+                        key={f.key}
+                        style={{ width: 170, flex: 'none' }}
+                        placeholder={f.label}
+                        min={0}
+                        value={v === undefined || v === '' ? null : Number(v)}
+                        onChange={(x) => setOpt(f.key, x)}
+                    />
+                );
+            })}
+            <Space size={4}>
+                <Switch
+                    size="small"
+                    checked={feedback.bgColor !== undefined}
+                    onChange={(checked) =>
+                        onChange({
+                            ...feedback,
+                            bgColor: checked ? DEFAULT_BG_COLOR : undefined,
+                        })
+                    }
+                />
+                {feedback.bgColor !== undefined && (
+                    <ColorPicker
+                        value={colorToHex(feedback.bgColor)}
+                        presets={BG_COLOR_PRESETS}
+                        onChange={(_, hex) =>
+                            onChange({ ...feedback, bgColor: hexToColor(hex) })
+                        }
+                    />
+                )}
+            </Space>
+            <Button
+                type="text"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={onRemove}
+            />
+        </div>
+    );
+}
+
 function ButtonEditor({
     open,
     page,
@@ -316,13 +481,18 @@ function ButtonEditor({
     triggerOptions: TriggerOption[] | null;
     savedTriggers: TriggerId[];
     saving: boolean;
-    onSave: (_text: string, _actions: EditAction[]) => void;
+    onSave: (
+        _text: string,
+        _actions: EditAction[],
+        _feedbacks: EditFeedback[]
+    ) => void;
     onSaveTriggers: (_events: TriggerId[]) => void;
     onClear: () => void;
     onClose: () => void;
 }) {
     const [text, setText] = useState('');
     const [actions, setActions] = useState<EditAction[]>([]);
+    const [feedbacks, setFeedbacks] = useState<EditFeedback[]>([]);
     const [events, setEvents] = useState<TriggerId[]>([]);
     const savedKey = [...savedTriggers].sort().join();
 
@@ -336,6 +506,13 @@ function ButtonEditor({
                     a.definitionId === 'overlayFunctions'
                         ? migrateLegacyOverlayOptions(a.options)
                         : a.options,
+            }))
+        );
+        setFeedbacks(
+            (button?.feedbacks ?? []).map((f) => ({
+                key: defFeedbackFor(f)?.key ?? f.definitionId,
+                options: f.options,
+                bgColor: f.bgColor,
             }))
         );
     }, [open, button]);
@@ -356,7 +533,7 @@ function ButtonEditor({
     // still gets its triggers.
     const save = () => {
         if (triggersChanged) onSaveTriggers(events);
-        if (editable) onSave(textToLabel(text), actions);
+        if (editable) onSave(textToLabel(text), actions, feedbacks);
         else onClose();
     };
 
@@ -385,6 +562,22 @@ function ButtonEditor({
     );
 
     const groups = useMemo(() => actionGroups(defs, layout), [defs, layout]);
+
+    // Only feedbacks whose module has a connection in this Companion.
+    const feedbackDefs = useMemo(
+        () =>
+            FEEDBACK_DEFS.filter(
+                (d) =>
+                    d.module === 'internal' ||
+                    layout?.connections.some((c) => c.module === d.module)
+            ),
+        [layout]
+    );
+
+    const feedbackGroups = useMemo(
+        () => actionGroups(feedbackDefs, layout),
+        [feedbackDefs, layout]
+    );
 
     const title = `${page?.name ?? ''} ${
         cell ? `${cell.row}/${cell.column}` : ''
@@ -484,6 +677,46 @@ function ButtonEditor({
                             </Button>
                         </div>
                     </Form.Item>
+                    <Form.Item label="Feedbacks">
+                        <div className="bf-actions">
+                            {feedbacks.map((f, i) => (
+                                <FeedbackRow
+                                    // eslint-disable-next-line react/no-array-index-key
+                                    key={i}
+                                    feedback={f}
+                                    groups={feedbackGroups}
+                                    vmixInputs={vmixInputs}
+                                    onChange={(next) =>
+                                        setFeedbacks(
+                                            feedbacks.map((x, j) =>
+                                                j === i ? next : x
+                                            )
+                                        )
+                                    }
+                                    onRemove={() =>
+                                        setFeedbacks(
+                                            feedbacks.filter((_, j) => j !== i)
+                                        )
+                                    }
+                                />
+                            ))}
+                            <Button
+                                icon={<PlusOutlined />}
+                                disabled={!feedbackDefs.length}
+                                onClick={() =>
+                                    setFeedbacks([
+                                        ...feedbacks,
+                                        {
+                                            key: feedbackDefs[0].key,
+                                            options: {},
+                                        },
+                                    ])
+                                }
+                            >
+                                Feedback
+                            </Button>
+                        </div>
+                    </Form.Item>
                     {triggers}
                 </Form>
             ) : (
@@ -497,6 +730,11 @@ function ButtonEditor({
                         {(button?.actions ?? []).map((a) => (
                             <div key={a.id}>
                                 <Text code>{a.definitionId}</Text>
+                            </div>
+                        ))}
+                        {(button?.feedbacks ?? []).map((f) => (
+                            <div key={f.id}>
+                                <Text code>feedback: {f.definitionId}</Text>
                             </div>
                         ))}
                     </div>
@@ -563,7 +801,7 @@ function ButtonGrid({
                                 onPick(r, c);
                             }}
                         >
-                            ✏️
+                            <EditOutlined />
                         </button>
                     )}
                 </div>
@@ -849,18 +1087,22 @@ export default function Bitfocus() {
         ? page?.buttons[`${cell.row}/${cell.column}`]
         : undefined;
 
-    const saveButton = (text: string, actions: EditAction[]) => {
+    const saveButton = (
+        text: string,
+        actions: EditAction[],
+        feedbacks: EditFeedback[]
+    ) => {
         if (!cell || !layout) return;
+        const connectionFor = (module: string) =>
+            module === 'internal'
+                ? 'internal'
+                : layout.connections.find((c) => c.module === module)?.id ??
+                  '';
         const resolved = actions.map((a) => {
             const def = ACTION_DEFS.find((d) => d.key === a.key)!;
-            const connectionId =
-                def.module === 'internal'
-                    ? 'internal'
-                    : layout.connections.find((c) => c.module === def.module)
-                          ?.id;
             return {
                 definitionId: def.definitionId,
-                connectionId: connectionId ?? '',
+                connectionId: connectionFor(def.module),
                 // Only the fields the editor shows; Companion fills the rest.
                 options: {
                     ...Object.fromEntries(
@@ -872,6 +1114,22 @@ export default function Bitfocus() {
                 },
             };
         });
+        const resolvedFeedbacks = feedbacks.map((f) => {
+            const def = FEEDBACK_DEFS.find((d) => d.key === f.key)!;
+            return {
+                definitionId: def.definitionId,
+                connectionId: connectionFor(def.module),
+                options: {
+                    ...Object.fromEntries(
+                        def.fields
+                            .filter((fl) => f.options[fl.key] !== undefined)
+                            .map((fl) => [fl.key, f.options[fl.key]])
+                    ),
+                    ...def.fixed,
+                },
+                bgColor: f.bgColor,
+            };
+        });
         setSaving('button');
         send('bitfocus:saveButton', {
             page: pageNumber,
@@ -879,6 +1137,7 @@ export default function Bitfocus() {
             column: cell.column,
             text,
             actions: resolved,
+            feedbacks: resolvedFeedbacks,
         });
     };
 

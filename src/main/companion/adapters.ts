@@ -19,11 +19,28 @@ export interface DownAction {
     options: Record<string, unknown>;
 }
 
+// A feedback's own options, plus the one style override this editor ever
+// writes: a flat background color on the button's own `box` layer (the
+// uniform "every feedback gets a color picker, the same way" mechanism -
+// not every feedback has its own bg/bgcolor option, but every feedback can
+// carry a style override, so that's the one path used for all of them).
+export interface DownFeedback extends DownAction {
+    // undefined when no override has been set yet on this feedback.
+    bgColor?: number;
+}
+
 export interface ButtonConfig {
     // 'button-layered' for a normal button
     type: string;
     actions: DownAction[];
+    // Lives in a flat `feedbacks` array at the top of the control's config,
+    // a sibling of `steps`/`style`, not nested in a step/action-set.
+    feedbacks: DownFeedback[];
     textLayerId?: string;
+    // The button's background box layer - target for the feedback color
+    // override above. Every normal button has one (confirmed in a live
+    // export: layer id "box0", type "box", a `color` property).
+    boxLayerId?: string;
 }
 
 export interface CompanionOps {
@@ -54,6 +71,30 @@ export interface CompanionOps {
         _value: unknown
     ): Promise<void>;
     removeAction(_controlId: string, _actionId: string): Promise<void>;
+    // Feedbacks are a separate flat entity list (entityLocation: 'feedbacks'),
+    // not nested in a step/action-set like actions are - otherwise the same
+    // add/set-option/remove shape over the same controls.entities.* calls.
+    addFeedback(
+        _controlId: string,
+        _connectionId: string,
+        _definitionId: string
+    ): Promise<string>;
+    setFeedbackOption(
+        _controlId: string,
+        _feedbackId: string,
+        _key: string,
+        _value: unknown
+    ): Promise<void>;
+    removeFeedback(_controlId: string, _feedbackId: string): Promise<void>;
+    // The one style override this editor writes: a flat background color on
+    // the button's box layer, same path for every feedback regardless of
+    // whether it has its own bg option (only some of the real modules' do).
+    setFeedbackColor(
+        _controlId: string,
+        _feedbackId: string,
+        _boxLayerId: string,
+        _color: number
+    ): Promise<void>;
     clearButton(_page: number, _row: number, _column: number): Promise<void>;
     close(): void;
 }
@@ -186,12 +227,20 @@ export async function replyShapeProblems(
 // #endregion
 
 const DOWN = { stepId: '0', setId: 'down' };
+// Feedbacks are their own entity list, not a step/action-set location - the
+// literal string Companion's entityLocation union uses for them.
+const FEEDBACKS = 'feedbacks' as const;
+// This editor only ever writes one style override per feedback (background
+// color on the box layer), so a fixed id is enough - nothing else needs to
+// address it, there's never more than one to disambiguate.
+const BG_OVERRIDE_ID = 'bg';
 
 const value = (v: unknown) => ({ isExpression: false, value: v });
 
 function toButtonConfig(config: any): ButtonConfig | null {
     if (!config) return null;
     const down: any[] = config.steps?.['0']?.action_sets?.down ?? [];
+    const feedbacks: any[] = config.feedbacks ?? [];
     return {
         type: config.type,
         actions: down.map((a) => ({
@@ -200,8 +249,24 @@ function toButtonConfig(config: any): ButtonConfig | null {
             connectionId: a.connectionId,
             options: a.options ?? {},
         })),
+        feedbacks: feedbacks.map((f) => {
+            const override = (f.styleOverrides ?? []).find(
+                (o: any) => o?.overrideId === BG_OVERRIDE_ID
+            );
+            const bgColor = override?.override?.value;
+            return {
+                id: String(f.id),
+                definitionId: f.definitionId,
+                connectionId: f.connectionId,
+                options: f.options ?? {},
+                bgColor: typeof bgColor === 'number' ? bgColor : undefined,
+            };
+        }),
         textLayerId: (config.style?.layers ?? []).find(
             (l: any) => l?.type === 'text'
+        )?.id,
+        boxLayerId: (config.style?.layers ?? []).find(
+            (l: any) => l?.type === 'box'
         )?.id,
     };
 }
@@ -293,6 +358,49 @@ function trpcOps(
                 controlId,
                 entityLocation: DOWN,
                 entityId: actionId,
+            });
+        },
+        async addFeedback(controlId, connectionId, definitionId) {
+            const id = await s.mutate('controls.entities.add', {
+                controlId,
+                entityLocation: FEEDBACKS,
+                ownerId: null,
+                connectionId,
+                entityType: 'feedback',
+                entityDefinition: definitionId,
+            });
+            if (!id) {
+                throw new Error(`Companion refused feedback ${definitionId}`);
+            }
+            return id;
+        },
+        async setFeedbackOption(controlId, feedbackId, key, v) {
+            await s.mutate('controls.entities.setOption', {
+                controlId,
+                entityLocation: FEEDBACKS,
+                entityId: feedbackId,
+                key,
+                value: value(v),
+            });
+        },
+        async removeFeedback(controlId, feedbackId) {
+            await s.mutate('controls.entities.remove', {
+                controlId,
+                entityLocation: FEEDBACKS,
+                entityId: feedbackId,
+            });
+        },
+        async setFeedbackColor(controlId, feedbackId, boxLayerId, color) {
+            await s.mutate('controls.entities.replaceStyleOverride', {
+                controlId,
+                entityLocation: FEEDBACKS,
+                entityId: feedbackId,
+                override: {
+                    overrideId: BG_OVERRIDE_ID,
+                    elementId: boxLayerId,
+                    elementProperty: 'color',
+                    override: value(color),
+                },
             });
         },
         async clearButton(page, row, column) {

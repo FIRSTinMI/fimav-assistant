@@ -13,6 +13,10 @@ export interface CompanionAction {
     options: Record<string, unknown>;
     // Some option is a Companion expression; the editor leaves it alone.
     hasExpression: boolean;
+    // Feedbacks only: the one style override this editor writes (a flat
+    // background color), undefined when none has been set. Always
+    // undefined on an action.
+    bgColor?: number;
 }
 
 export interface CompanionButton {
@@ -20,6 +24,9 @@ export interface CompanionButton {
     type: string;
     text: string;
     actions: CompanionAction[];
+    // Same shape as an action; Companion keeps feedbacks in their own flat
+    // list on the button, not nested in a step/action-set.
+    feedbacks: CompanionAction[];
 }
 
 export interface CompanionPage {
@@ -373,6 +380,94 @@ export const ACTION_DEFS: ActionDef[] = [
         ],
     },
 ];
+
+// X-Air mute feedbacks' `state` option: which state lights the button.
+// Verified against the installed module (v3.0.1, buildStripDefs.js): the
+// same {id:'1',label:'On'}/{id:'0',label:'Off'} dropdown on every strip's
+// mute feedback ('ch', 'config_mute', ...).
+const MUTE_STATE = [
+    { value: '1', label: 'On' },
+    { value: '0', label: 'Off' },
+];
+
+// Feedback catalog: same shape as an action (ActionDef/ActionField), reusing
+// those types - a feedback is a Companion entity with a definitionId and
+// options, same as an action, just stored in its own list on the button
+// instead of a step's action_sets. Deliberately small (Filip, 2026-11-14):
+// pick a source (what's in program, what overlay is showing, an input/
+// group's mute state) - nothing about text or the other style-override
+// properties Companion's own "Style Overrides" section can already change
+// directly in Companion if wanted.
+//
+// No color field here on any entry, including vmix's own (which does have
+// one): the background color is set the same way for every feedback type,
+// through Companion's generic style-override mechanism (bitfocus.ts
+// setFeedbackColor), not each definition's own options. X-Air's feedbacks
+// have no color option at all, so this is the only way to color those -
+// using it for vmix too keeps every feedback type working the same way
+// (Filip, 2026-11-14: "Just use bitfocus's styling changes for everything
+// to be consistent").
+// Verified against the real installed modules: studiocoast-vmix v4.2.0
+// (src/feedbacks/tallyFeedbacks.ts upstream) and behringer-xair v3.0.1
+// (buildStripDefs.js/defStrip.js upstream).
+export const FEEDBACK_DEFS: ActionDef[] = [
+    {
+        key: 'studiocoast-vmix:inputLive',
+        module: 'studiocoast-vmix',
+        definitionId: 'inputLive',
+        label: 'In program',
+        fields: [{ key: 'input', label: 'Input', type: 'vmixInput' }],
+    },
+    {
+        key: 'studiocoast-vmix:overlayStatus',
+        module: 'studiocoast-vmix',
+        definitionId: 'overlayStatus',
+        label: 'Overlay on',
+        fields: [
+            { key: 'input', label: 'Input (blank = any)', type: 'vmixInput' },
+            {
+                key: 'overlay',
+                label: 'Overlay',
+                type: 'select',
+                options: [
+                    { value: '0', label: 'Any' },
+                    ...OVERLAY_NUMBERS,
+                ],
+            },
+        ],
+    },
+    {
+        key: 'behringer-xair:ch',
+        module: 'behringer-xair',
+        definitionId: 'ch',
+        label: 'Channel mute',
+        fields: [
+            { key: 'theChannel', label: 'Channel', type: 'number' },
+            { key: 'state', label: 'When', type: 'select', options: MUTE_STATE },
+        ],
+    },
+    {
+        key: 'behringer-xair:config_mute',
+        module: 'behringer-xair',
+        definitionId: 'config_mute',
+        label: 'Group mute',
+        fields: [
+            { key: 'theChannel', label: 'Group', type: 'number' },
+            { key: 'state', label: 'When', type: 'select', options: MUTE_STATE },
+        ],
+    },
+];
+
+export function matchFeedbackDef(
+    definitionId: string,
+    options: Record<string, unknown>
+): ActionDef | undefined {
+    return FEEDBACK_DEFS.find(
+        (d) =>
+            d.definitionId === definitionId &&
+            Object.entries(d.fixed ?? {}).every(([k, v]) => options[k] === v)
+    );
+}
 
 // The catalog entry an existing action is, or undefined if the editor does
 // not handle it (then the button is edited in Companion).
