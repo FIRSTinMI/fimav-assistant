@@ -97,10 +97,15 @@ export interface FtcRecorderHost {
 const logger = log.scope('ftc.recorder');
 
 function levelFor(shortName: string): TournamentLevel {
-    // Practice and qualification short names start P / Q; anything else is a
-    // playoff match.
+    // Practice, qualification and test short names start P / Q / T;
+    // anything else is a playoff match. A test match ("T-2") falling
+    // through to Playoff by default mislabeled it in the status display
+    // (Filip, 2026-11-14, live at Chelsea Qualifier) - the recorded file
+    // itself was unaffected, since the in-season filename builder uses the
+    // FTC ShortName directly and never reaches this Level at all.
     if (/^Q/i.test(shortName)) return 'Qualification';
     if (/^P(R)?[-\d]/i.test(shortName)) return 'Practice';
+    if (/^T[-\d]/i.test(shortName)) return 'Match Test';
     return 'Playoff';
 }
 
@@ -325,21 +330,47 @@ export default class FtcRecorder {
     private async onPost(u: FtcUpdate, now: number) {
         const tl = await this.timeline();
         if (!tl) return;
-        // The newest unfinished run of this match. A second post of the same
-        // match (a score edit) finds none and is ignored.
-        const run = [...tl.runs]
+        // FTC Live's own spec (ApiV2UpdateMatchResultsPayload) only requires
+        // number, field, redScore and blueScore on a post - shortName is
+        // optional there (unlike on the start payload) and evidently comes
+        // through empty for at least a test match (Filip, 2026-11-14, live
+        // at Chelsea Qualifier: "T-2"'s post matched no run, so nothing ever
+        // told the recorder its scores were in, and it ran until the wait
+        // timer - he had to stop it by hand). number+field are guaranteed,
+        // so they are the real match key; shortName (when present) only
+        // disambiguates two pending runs that happen to share both.
+        const pending = [...tl.runs]
             .reverse()
-            .find(
-                (r) =>
-                    r.shortName === (u.shortName || `Match ${u.number}`) &&
-                    r.post === null &&
-                    r.abortAt === null &&
-                    !r.done
+            .filter((r) => r.post === null && r.abortAt === null && !r.done);
+        const byNumberField = pending.filter(
+            (r) => r.number === u.number && r.field === u.field
+        );
+        const run =
+            (u.shortName &&
+                byNumberField.find((r) => r.shortName === u.shortName)) ||
+            byNumberField[0] ||
+            (u.shortName && pending.find((r) => r.shortName === u.shortName));
+        if (!run) {
+            this.host.log(
+                `Scores posted for match ${u.number} field ${u.field}${
+                    u.shortName ? ` ("${u.shortName}")` : ''
+                } matched no pending run (pending: ${
+                    pending.map((r) => r.shortName).join(', ') || 'none'
+                })`
             );
-        if (!run) return;
+            return;
+        }
         run.post = Math.max(now, run.playEnd - LEAD_SECONDS * 1000);
         run.gaveUp = false;
         this.save();
+        if (u.redScore !== undefined && u.blueScore !== undefined) {
+            const rec = getMatch(tl.folder, run.id);
+            if (rec) {
+                updateMatch(tl.folder, run.id, {
+                    score: { red: u.redScore, blue: u.blueScore },
+                });
+            }
+        }
         this.host.log(`Scores posted for ${run.shortName}`);
         await this.ensureRecording(now);
         this.schedule();

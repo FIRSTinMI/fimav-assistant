@@ -187,6 +187,16 @@ export default class FtcScorekeeper extends EventEmitter {
             number: Number(msg.payload?.number) || 0,
             shortName: String(msg.payload?.shortName ?? ''),
             field: Number(msg.payload?.field) || 1,
+            // Only MATCH_POST's payload (ApiV2UpdateMatchResultsPayload) has
+            // these; everything else leaves them undefined.
+            redScore:
+                msg.payload?.redScore !== undefined
+                    ? Number(msg.payload.redScore)
+                    : undefined,
+            blueScore:
+                msg.payload?.blueScore !== undefined
+                    ? Number(msg.payload.blueScore)
+                    : undefined,
         };
         this.setStatus({ lastUpdate: update });
         this.emit('update', update);
@@ -202,7 +212,9 @@ export default class FtcScorekeeper extends EventEmitter {
         const loc = triggers[`${update.type}:${update.field}`];
         if (!loc) return;
         fetch(
-            `${companionUrl()}/api/location/${loc.page}/${loc.row}/${loc.column}/press`,
+            `${companionUrl()}/api/location/${loc.page}/${loc.row}/${
+                loc.column
+            }/press`,
             { method: 'POST', signal: AbortSignal.timeout(3000) }
         ).catch((e) =>
             logger.warn(`Companion press for ${update.type} failed`, e.message)
