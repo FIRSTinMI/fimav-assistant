@@ -42,6 +42,7 @@ import {
     clearCompanionButton,
     companionUrl,
     CUSTOM_AD_URL,
+    pressCompanionButton,
     readCompanionLayout,
     readCustomAd,
     readFmsAutomation,
@@ -799,6 +800,12 @@ export default function registerAllEvents(window: BrowserWindow | null) {
         })
     );
 
+    ipcMain.on('bitfocus:pressButton', (event, [page, row, column]) =>
+        bitfocusReply(event, 'pressButton', async () => {
+            await pressCompanionButton(companionUrl(), page, row, column);
+        })
+    );
+
     ipcMain.on('bitfocus:getVmixInputs', (event) =>
         bitfocusReply(event, 'vmixInputs', async () =>
             (await VmixService.Instance.GetInputs()).map((i) => i.title)
@@ -1546,9 +1553,14 @@ export default function registerAllEvents(window: BrowserWindow | null) {
 
     // Register a listener for the backend status.  Any time the renderer sends this event, we'll send the current status of the backend
     ipcMain.on('backend-status', (event) => {
+        // lastAutoAV only gets set when AutoAV emits an 'info' event, which
+        // doesn't happen on a quiet run (nothing erroring, nothing to
+        // notify about) - a freshly (re)loaded window saw nothing yet and
+        // showed "Unknown" even though AutoAV is running fine. Fall back to
+        // its actual current status message instead of leaving it null.
         event.reply('backend-status-update', {
             key: 'auto_av_log',
-            val: lastAutoAV,
+            val: lastAutoAV ?? AutoAV.Instance.getStatus().lastMessage,
         });
         event.reply('backend-status-update', {
             key: 'hw_stats',

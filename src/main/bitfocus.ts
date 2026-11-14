@@ -306,6 +306,22 @@ export function clearCompanionButton(
     return withOps(baseUrl, (ops) => ops.clearButton(page, row, column));
 }
 
+// Companion's documented legacy HTTP API (stable across every version this
+// tab supports, unlike the tRPC calls above): press a button as if it were
+// tapped on the physical surface.
+export async function pressCompanionButton(
+    baseUrl: string,
+    page: number,
+    row: number,
+    column: number
+): Promise<void> {
+    const res = await fetch(
+        `${baseUrl}/api/location/${page}/${row}/${column}/press`,
+        { method: 'POST', signal: AbortSignal.timeout(5000) }
+    );
+    if (!res.ok) throw new Error(`Companion press failed: ${res.status}`);
+}
+
 export async function readCompanionLayout(
     baseUrl: string
 ): Promise<CompanionLayout> {

@@ -81,12 +81,31 @@ export interface ActionDef {
     fixed?: Record<string, string>;
 }
 
-const OVERLAY_FUNCTIONS = [1, 2, 3, 4, 5, 6, 7, 8].flatMap((n) => [
-    { value: `OverlayInput${n}`, label: `Overlay ${n} toggle` },
-    { value: `OverlayInput${n}In`, label: `Overlay ${n} in` },
-    { value: `OverlayInput${n}Out`, label: `Overlay ${n} out` },
-    { value: `OverlayInput${n}Off`, label: `Overlay ${n} off` },
-]);
+// studiocoast-vmix v4.2.0's real overlayFunctions schema: `type` (this
+// dropdown) and `overlay` (the channel number) are separate options - the
+// number is NOT embedded in the dropdown value. An older module version
+// combined them into one `functionID` string like "OverlayInput3In"; that
+// stopped matching once the installed module moved to this split schema,
+// so a saved button silently fell back to Companion's default (plain
+// toggle) instead of the chosen operation, on whatever overlay number was
+// already stored. Verified against the installed version directly:
+// github.com/bitfocus/companion-module-studiocoast-vmix tag v4.2.0,
+// src/actions/overlayActions.ts.
+const OVERLAY_TYPES = [
+    { value: 'OverlayInput', label: 'Toggle on program' },
+    { value: 'PreviewOverlayInput', label: 'Toggle on preview' },
+    { value: 'In', label: 'Transition in' },
+    { value: 'Out', label: 'Transition out' },
+    { value: 'Last', label: 'Last input on/off' },
+    { value: 'Off', label: 'Off' },
+    { value: 'Zoom', label: 'Zoom PIP to/from fullscreen' },
+    { value: 'OverlayInputAllOff', label: 'All overlays off' },
+];
+
+const OVERLAY_NUMBERS = [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({
+    value: String(n),
+    label: `Overlay ${n}`,
+}));
 
 const TRANSITIONS = [
     'Cut',
@@ -167,10 +186,16 @@ export const ACTION_DEFS: ActionDef[] = [
         label: 'Overlay',
         fields: [
             {
-                key: 'functionID',
+                key: 'type',
+                label: 'Function',
+                type: 'select',
+                options: OVERLAY_TYPES,
+            },
+            {
+                key: 'overlay',
                 label: 'Overlay',
                 type: 'select',
-                options: OVERLAY_FUNCTIONS,
+                options: OVERLAY_NUMBERS,
             },
             { key: 'input', label: 'Input', type: 'vmixInput' },
         ],
@@ -351,6 +376,29 @@ export const ACTION_DEFS: ActionDef[] = [
 
 // The catalog entry an existing action is, or undefined if the editor does
 // not handle it (then the button is edited in Companion).
+// Before the type+overlay split (this session, 2026-11-14), the editor wrote
+// a single combined `functionID` like "OverlayInput3In" - a button saved
+// under that shape has no `type`/`overlay` at all, so the Select for each
+// renders blank. Saving a blank-but-unchanged selection would send no type/
+// overlay and reproduce the exact "falls back to toggle" bug this was fixing,
+// this time self-inflicted. Derive a starting guess from the old value so the
+// editor shows what the button already does instead of blanking it out.
+export function migrateLegacyOverlayOptions(
+    options: Record<string, unknown>
+): Record<string, unknown> {
+    if (options.type !== undefined || options.overlay !== undefined)
+        return options;
+    const legacy = options.functionID;
+    if (typeof legacy !== 'string') return options;
+    const m = /^OverlayInput(\d+)(In|Out|Off)?$/.exec(legacy);
+    if (!m) return options;
+    return {
+        ...options,
+        type: m[2] ?? 'OverlayInput',
+        overlay: m[1],
+    };
+}
+
 export function matchActionDef(
     definitionId: string,
     options: Record<string, unknown>

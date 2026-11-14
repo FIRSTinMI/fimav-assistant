@@ -545,7 +545,22 @@ async function getAudioDevices(
         // Missing (e.g. quarantined) or hung exe: resolve empty rather than
         // throw an unhandled 'error' or never settle. The checks call this
         // every minute and wait on it.
-        const timer = setTimeout(() => proc.kill(), 10000);
+        //
+        // proc.kill() alone is not enough: a SoundVolumeView instance stuck
+        // in a kernel-mode wait (confirmed 2026-11-13 - Stop-Process -Force
+        // and taskkill /F both "succeed" with no error yet the process never
+        // actually dies) never fires 'exit', so the timeout must resolve the
+        // promise itself rather than only attempt to kill and wait for exit
+        // - otherwise every check after this one in the tick hangs forever,
+        // and since ticks chain on one one-at-a-time promise, so does every
+        // later tick. If 'exit' does eventually fire after this (a slow but
+        // real kill), its resolve(...) below is a harmless no-op - a
+        // Promise only honours the first settle.
+        const timer = setTimeout(() => {
+            log.warn('SoundVolumeView did not exit in 10s, giving up on it');
+            proc.kill();
+            resolve([]);
+        }, 10000);
         proc.on('error', (err) => {
             clearTimeout(timer);
             log.error('SoundVolumeView failed to start: ', err);
@@ -651,8 +666,18 @@ async function runSetSoundCommand(
     return new Promise((resolve, reject) => {
         // Spawn the process
         const proc = spawn(SoundVolumeViewPath, [cmd, ...params]);
-        // A hung exe must not leave the caller waiting forever.
-        const timer = setTimeout(() => proc.kill(), 10000);
+        // A hung exe must not leave the caller waiting forever. Same fix as
+        // getAudioDevices above: proc.kill() alone is not enough for one
+        // stuck in a kernel-mode wait (confirmed 2026-11-13 - it survives
+        // Stop-Process -Force and taskkill /F with no error and never fires
+        // 'exit'), so the timeout must settle the promise itself. If 'exit'
+        // or 'error' still fire after this (a slow but real kill), their
+        // resolve/reject below are a harmless no-op - a Promise only
+        // honours the first settle.
+        const timer = setTimeout(() => {
+            proc.kill();
+            resolve(false);
+        }, 10000);
         // Listen for exit
         proc.on('exit', () => {
             clearTimeout(timer);
