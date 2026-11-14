@@ -30,6 +30,10 @@ export interface FtcUpdate {
     number: number;
     shortName: string;
     field: number;
+    // MATCH_POST only (FTC Live's ApiV2UpdateMatchResultsPayload); undefined
+    // on every other type.
+    redScore?: number;
+    blueScore?: number;
 }
 
 export interface FtcScorekeeperStatus {
