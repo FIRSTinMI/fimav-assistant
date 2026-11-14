@@ -747,6 +747,7 @@ function ButtonEditor({
 function ButtonGrid({
     page,
     locked,
+    previewImages,
     hasTriggers,
     onPick,
     onPress,
@@ -754,6 +755,8 @@ function ButtonGrid({
     page: CompanionPage;
     // Companion's version has no editor: every button is read only.
     locked: boolean;
+    // `${row}/${column}` -> Companion's live rendered PNG, when watching.
+    previewImages: Record<string, string | null>;
     hasTriggers: (_row: number, _column: number) => boolean;
     onPick: (_row: number, _column: number) => void;
     onPress: (_row: number, _column: number) => void;
@@ -762,6 +765,8 @@ function ButtonGrid({
     for (let r = 0; r < page.rows; r += 1) {
         for (let c = 0; c < page.columns; c += 1) {
             const b = page.buttons[`${r}/${c}`];
+            const image = previewImages[`${r}/${c}`];
+            const label = b ? labelToText(b.text) || b.type : '';
             cells.push(
                 <div className="bf-cell-wrap" key={`${r}/${c}`}>
                     <button
@@ -772,12 +777,24 @@ function ButtonGrid({
                                 : ''
                         }${hasTriggers(r, c) ? ' bf-cell--fms' : ''}`}
                         title={`${r}/${c}`}
+                        style={
+                            image
+                                ? {
+                                      backgroundImage: `url(${image})`,
+                                      backgroundSize: 'cover',
+                                      backgroundPosition: 'center',
+                                  }
+                                : undefined
+                        }
                         // A button here presses it (the point of the grid);
                         // an empty cell has nothing to press, so it opens
                         // the editor to create one.
                         onClick={() => (b ? onPress(r, c) : onPick(r, c))}
                     >
-                        {b ? labelToText(b.text) || b.type : ''}
+                        {/* Companion's own render already carries the text
+                            and any feedback styling, so it replaces this
+                            plain label rather than sitting under it. */}
+                        {image ? '' : label}
                     </button>
                     {/* An empty cell's main click already opens the editor
                         (nothing to press), so a pencil there would be a dead
@@ -933,6 +950,11 @@ export default function Bitfocus() {
     );
     const [saving, setSaving] = useState<string | null>(null);
     const [vmixInputs, setVmixInputs] = useState<string[]>([]);
+    // `${row}/${column}` -> Companion's rendered PNG for that cell, or null
+    // once Companion has answered but has nothing to draw.
+    const [previewImages, setPreviewImages] = useState<
+        Record<string, string | null>
+    >({});
     const [fms, setFms] = useState<FmsAutomationConfig | null>(null);
     // A save is in flight, so its answer gets a message (a load does not).
     const fmsSaveRef = useRef(false);
@@ -1048,6 +1070,15 @@ export default function Bitfocus() {
             (st: { companionPort: number }) =>
                 setCompanionPort(st.companionPort)
         );
+        const offPreview = ipcRenderer.on(
+            'bitfocus:previewImage',
+            (p: { row: number; column: number; image: string | null }) => {
+                setPreviewImages((prev) => ({
+                    ...prev,
+                    [`${p.row}/${p.column}`]: p.image,
+                }));
+            }
+        );
         send('autoav:getState');
         send('app:getSettings');
         loadAll();
@@ -1057,6 +1088,7 @@ export default function Bitfocus() {
             offResult();
             offFtc();
             offFtcStatus();
+            offPreview();
         };
     }, [loadAll]);
 
@@ -1078,6 +1110,26 @@ export default function Bitfocus() {
             setPageNumber(layout.pages[0].number);
         }
     }, [layout, page]);
+
+    // Watch every set cell on the shown page for its live rendered image;
+    // paused while a button dialog is open, same as the layout poll (an open
+    // editor already shows its own fields, not the grid). cellsKey stands in
+    // for the cell list itself, which is rebuilt every render.
+    const cellsKey = page ? Object.keys(page.buttons).sort().join() : '';
+    useEffect(() => {
+        if (cell || !page) {
+            send('bitfocus:unwatchPreviews');
+            return undefined;
+        }
+        setPreviewImages({});
+        const cells = Object.keys(page.buttons).map((k) => {
+            const [row, column] = k.split('/').map(Number);
+            return { row, column };
+        });
+        send('bitfocus:watchPreviews', page.number, cells);
+        return () => send('bitfocus:unwatchPreviews');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cell, page?.number, cellsKey]);
     const button = cell
         ? page?.buttons[`${cell.row}/${cell.column}`]
         : undefined;
@@ -1091,8 +1143,7 @@ export default function Bitfocus() {
         const connectionFor = (module: string) =>
             module === 'internal'
                 ? 'internal'
-                : layout.connections.find((c) => c.module === module)?.id ??
-                  '';
+                : layout.connections.find((c) => c.module === module)?.id ?? '';
         const resolved = actions.map((a) => {
             const def = ACTION_DEFS.find((d) => d.key === a.key)!;
             return {
@@ -1294,6 +1345,7 @@ export default function Bitfocus() {
                                 <ButtonGrid
                                     page={page}
                                     locked={!layout.editable}
+                                    previewImages={previewImages}
                                     hasTriggers={(r, c) =>
                                         triggersAt(r, c).length > 0
                                     }

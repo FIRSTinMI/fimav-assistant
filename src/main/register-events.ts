@@ -49,6 +49,8 @@ import {
     saveCompanionButton,
     saveCustomAd,
     saveFmsAutomation,
+    stopButtonPreviews,
+    watchButtonPreviews,
 } from './bitfocus';
 
 // Use this file to register all events. For uniformity, all events should send their response as <event-name>-response
@@ -811,6 +813,31 @@ export default function registerAllEvents(window: BrowserWindow | null) {
             (await VmixService.Instance.GetInputs()).map((i) => i.title)
         )
     );
+
+    // Live button previews: Companion's own rendered PNG per cell, pushed
+    // whenever that button's look (feedbacks included) changes. Not a
+    // request/reply op - images arrive on their own as `bitfocus:previewImage`.
+    ipcMain.on(
+        'bitfocus:watchPreviews',
+        (
+            _event,
+            [page, cells]: [number, { row: number; column: number }[]]
+        ) => {
+            watchButtonPreviews(
+                companionUrl(),
+                page,
+                cells,
+                (row, column, image) =>
+                    window?.webContents.send('bitfocus:previewImage', {
+                        row,
+                        column,
+                        image,
+                    })
+            ).catch((e) => log.error('Bitfocus preview watch failed', e));
+        }
+    );
+
+    ipcMain.on('bitfocus:unwatchPreviews', () => stopButtonPreviews());
 
     // FTC Live: connection status pushed to the UI, settings, scan, triggers.
     FtcScorekeeper.Instance.on('status', (s) =>

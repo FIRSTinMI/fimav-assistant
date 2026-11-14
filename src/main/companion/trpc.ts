@@ -21,6 +21,12 @@ export class TrpcSession {
 
     private waiting = new Map<number, (_m: any) => void>();
 
+    // Long-lived subscriptions (preview images): unlike `waiting`, a hit
+    // here is never deleted after one message - every value the
+    // subscription ever emits goes to the same callback, until `subscribe`'s
+    // returned stop function removes it.
+    private subs = new Map<number, (_m: any) => void>();
+
     private constructor(ws: WebSocket) {
         this.ws = ws;
         ws.on('message', (data) => {
@@ -35,10 +41,15 @@ export class TrpcSession {
             } catch {
                 return; // not a tRPC frame
             }
-            const cb = this.waiting.get(m?.id);
-            if (!cb) return;
             // A subscription answers "started" before its first data.
             if (m.result?.type === 'started') return;
+            const subCb = this.subs.get(m?.id);
+            if (subCb) {
+                subCb(m);
+                return;
+            }
+            const cb = this.waiting.get(m?.id);
+            if (!cb) return;
             this.waiting.delete(m.id);
             cb(m);
         });
@@ -115,6 +126,43 @@ export class TrpcSession {
 
     first(path: string, input: unknown) {
         return this.send('subscription', path, input);
+    }
+
+    // A subscription kept open for every value it emits (preview images),
+    // unlike `first`'s one-shot read. Returns a function that stops it.
+    subscribe(
+        path: string,
+        input: unknown,
+        onData: (_d: any) => void,
+        onError: (_e: TrpcError) => void
+    ): () => void {
+        this.nextId += 1;
+        const id = this.nextId;
+        this.subs.set(id, (m) => {
+            if (m.error) {
+                this.subs.delete(id);
+                onError(
+                    trpcError(
+                        path,
+                        m.error.message ?? JSON.stringify(m.error),
+                        m.error.data?.code ?? String(m.error.code ?? '')
+                    )
+                );
+                return;
+            }
+            onData(m.result?.data);
+        });
+        this.ws.send(
+            JSON.stringify({
+                id,
+                method: 'subscription',
+                params: { path, input },
+            })
+        );
+        return () => {
+            if (!this.subs.delete(id)) return;
+            this.ws.send(JSON.stringify({ id, method: 'subscription.stop' }));
+        };
     }
 
     // Whether a procedure of this kind exists, without running it. tRPC looks

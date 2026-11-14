@@ -158,6 +158,21 @@ const ON_OFF_TOGGLE = (base: string) => [
     { value: `${base}Off`, label: 'Off' },
 ];
 
+// vMix's audioBusMaster dropdown (utils.ts): the buses an input's audio can
+// route to, Master plus A-G, or "Selected" (whichever bus FIM's layout is
+// currently routing - instance.routingData.bus).
+const AUDIO_BUS_MASTER = [
+    'Master',
+    'A',
+    'B',
+    'C',
+    'D',
+    'E',
+    'F',
+    'G',
+    'Selected',
+].map((b) => ({ value: b, label: b }));
+
 const REPLAY_CHANNEL: ActionField = {
     key: 'channel',
     label: 'Channel',
@@ -264,6 +279,31 @@ export const ACTION_DEFS: ActionDef[] = [
                 label: 'Audio',
                 type: 'select',
                 options: ON_OFF_TOGGLE('Audio'),
+            },
+        ],
+    },
+    {
+        key: 'studiocoast-vmix:audioBus',
+        module: 'studiocoast-vmix',
+        definitionId: 'audioBus',
+        label: 'Input audio to bus',
+        fields: [
+            { key: 'input', label: 'Input', type: 'vmixInput' },
+            {
+                key: 'value',
+                label: 'Bus',
+                type: 'select',
+                options: AUDIO_BUS_MASTER,
+            },
+            {
+                key: 'functionID',
+                label: 'Mix',
+                type: 'select',
+                options: [
+                    { value: 'AudioBus', label: 'Toggle' },
+                    { value: 'AudioBusOn', label: 'On' },
+                    { value: 'AudioBusOff', label: 'Off' },
+                ],
             },
         ],
     },
@@ -450,10 +490,7 @@ export const FEEDBACK_DEFS: ActionDef[] = [
                 key: 'overlay',
                 label: 'Overlay',
                 type: 'select',
-                options: [
-                    { value: '0', label: 'Any' },
-                    ...OVERLAY_NUMBERS,
-                ],
+                options: [{ value: '0', label: 'Any' }, ...OVERLAY_NUMBERS],
             },
         ],
         // One swatch for both; Companion keeps separate preview/program
@@ -466,9 +503,36 @@ export const FEEDBACK_DEFS: ActionDef[] = [
         definitionId: 'status',
         label: 'vMix status',
         fields: [
-            { key: 'status', label: 'Status', type: 'select', options: VMIX_STATUS },
+            {
+                key: 'status',
+                label: 'Status',
+                type: 'select',
+                options: VMIX_STATUS,
+            },
         ],
         fixed: { value: '' },
+    },
+    {
+        key: 'studiocoast-vmix:inputAudio',
+        module: 'studiocoast-vmix',
+        definitionId: 'inputAudio',
+        label: 'Input audio muted',
+        fields: [{ key: 'input', label: 'Input', type: 'vmixInput' }],
+    },
+    {
+        key: 'studiocoast-vmix:inputBusRouting',
+        module: 'studiocoast-vmix',
+        definitionId: 'inputBusRouting',
+        label: 'Input audio on bus',
+        fields: [
+            { key: 'input', label: 'Input', type: 'vmixInput' },
+            {
+                key: 'value',
+                label: 'Bus',
+                type: 'select',
+                options: AUDIO_BUS_MASTER,
+            },
+        ],
     },
     {
         key: 'behringer-xair:ch',
@@ -477,7 +541,12 @@ export const FEEDBACK_DEFS: ActionDef[] = [
         label: 'Channel mute',
         fields: [
             { key: 'theChannel', label: 'Channel', type: 'number' },
-            { key: 'state', label: 'When', type: 'select', options: MUTE_STATE },
+            {
+                key: 'state',
+                label: 'When',
+                type: 'select',
+                options: MUTE_STATE,
+            },
         ],
     },
     {
@@ -487,7 +556,12 @@ export const FEEDBACK_DEFS: ActionDef[] = [
         label: 'Group mute',
         fields: [
             { key: 'theChannel', label: 'Group', type: 'number' },
-            { key: 'state', label: 'When', type: 'select', options: MUTE_STATE },
+            {
+                key: 'state',
+                label: 'When',
+                type: 'select',
+                options: MUTE_STATE,
+            },
         ],
     },
     {
