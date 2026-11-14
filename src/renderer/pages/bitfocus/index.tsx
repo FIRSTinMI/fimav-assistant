@@ -199,17 +199,17 @@ function ActionRow({
     const setOpt = (k: string, v: unknown) =>
         onChange({ ...action, options: { ...action.options, [k]: v } });
     // AntD's AutoComplete always runs rc-select in "combobox" mode, which
-    // hard-ignores any `searchValue` prop and derives the filter text from
-    // the current *value* instead (rc-select/BaseSelect.js's mergedSearchValue:
-    // `mode !== 'combobox' ? searchValue : displayValues[0].value`) - so a
-    // `searchValue`/`onSearch` pair here would compile and look like a fix
-    // but never actually affect filtering. The real fix: track "a selection
-    // was just made" per field and have filterOption ignore its `input`
-    // argument entirely while that's true (showing every option), instead
-    // of trying to control what that argument is. onSearch still fires on
-    // real typing (confirmed in rc-select's source) and clears the flag, so
-    // normal substring filtering resumes as soon as the user types again.
-    const [justPicked, setJustPicked] = useState<Record<string, boolean>>({});
+    // derives its *own* filter text from the picked value rather than from
+    // typing (rc-select/BaseSelect.js's mergedSearchValue), so any fix built
+    // on top of `filterOption`'s `input` argument is fighting a value that
+    // mode controls, not this code - confirmed still broken live even with
+    // an `input`-ignoring filterOption. Filtering the `options` list here
+    // instead, with `filterOption={false}` telling rc-select not to filter
+    // further, means rc-select's own search-value quirk never gets a vote:
+    // the list shown is always exactly this array. `filterText` only
+    // changes from typing (onSearch) and clears on a pick, so a pick always
+    // leaves the full list ready for the next one.
+    const [filterText, setFilterText] = useState<Record<string, string>>({});
     return (
         <div className="bf-action">
             <Select
@@ -230,6 +230,7 @@ function ActionRow({
                         !!v &&
                         vmixInputs.length > 0 &&
                         !vmixInputs.includes(v as string);
+                    const text = (filterText[f.key] ?? '').toLowerCase();
                     return (
                         <Tooltip
                             key={f.key}
@@ -240,25 +241,23 @@ function ActionRow({
                                 status={missing ? 'error' : undefined}
                                 placeholder={f.label}
                                 value={(v as string) ?? ''}
-                                onSearch={() =>
-                                    setJustPicked((prev) =>
-                                        prev[f.key]
-                                            ? { ...prev, [f.key]: false }
-                                            : prev
+                                filterOption={false}
+                                onSearch={(x) =>
+                                    setFilterText((prev) => ({
+                                        ...prev,
+                                        [f.key]: x,
+                                    }))
+                                }
+                                options={vmixInputs
+                                    .filter((i) =>
+                                        i.toLowerCase().includes(text)
                                     )
-                                }
-                                options={vmixInputs.map((i) => ({ value: i }))}
-                                filterOption={(input, o) =>
-                                    justPicked[f.key] ||
-                                    String(o?.value ?? '')
-                                        .toLowerCase()
-                                        .includes(input.toLowerCase())
-                                }
+                                    .map((i) => ({ value: i }))}
                                 onChange={(x) => {
                                     setOpt(f.key, x);
-                                    setJustPicked((prev) => ({
+                                    setFilterText((prev) => ({
                                         ...prev,
-                                        [f.key]: true,
+                                        [f.key]: '',
                                     }));
                                 }}
                             />
@@ -304,9 +303,9 @@ function ActionRow({
 interface EditFeedback {
     key: string; // FEEDBACK_DEFS key
     options: Record<string, unknown>;
-    // undefined = no background override set; Companion's own default style
-    // (or whatever was set directly in Companion) stands.
-    bgColor?: number;
+    // Every feedback shown here always has a color; delete the row instead
+    // of needing an "off" state for it (Filip, 2026-11-14).
+    bgColor: number;
 }
 
 const colorToHex = (c: number) => `#${c.toString(16).padStart(6, '0')}`;
@@ -345,10 +344,10 @@ function FeedbackRow({
     const def = FEEDBACK_DEFS.find((d) => d.key === feedback.key);
     const setOpt = (k: string, v: unknown) =>
         onChange({ ...feedback, options: { ...feedback.options, [k]: v } });
-    // See ActionRow's comment: AutoComplete's `searchValue` is ignored in its
-    // always-on combobox mode, so filtering is suppressed via this flag
-    // instead, right after a pick.
-    const [justPicked, setJustPicked] = useState<Record<string, boolean>>({});
+    // See ActionRow's comment: the options list is filtered here, with
+    // filterOption={false} so rc-select's own combobox search-value quirk
+    // never gets a vote.
+    const [filterText, setFilterText] = useState<Record<string, string>>({});
     return (
         <div className="bf-action">
             <Select
@@ -358,7 +357,9 @@ function FeedbackRow({
                 popupMatchSelectWidth={220}
                 value={feedback.key}
                 options={groups}
-                onChange={(key) => onChange({ key, options: {} })}
+                onChange={(key) =>
+                    onChange({ key, options: {}, bgColor: feedback.bgColor })
+                }
             />
             {def?.fields.map((f) => {
                 const v = feedback.options[f.key];
@@ -367,6 +368,7 @@ function FeedbackRow({
                         !!v &&
                         vmixInputs.length > 0 &&
                         !vmixInputs.includes(v as string);
+                    const text = (filterText[f.key] ?? '').toLowerCase();
                     return (
                         <Tooltip
                             key={f.key}
@@ -377,25 +379,23 @@ function FeedbackRow({
                                 status={missing ? 'error' : undefined}
                                 placeholder={f.label}
                                 value={(v as string) ?? ''}
-                                onSearch={() =>
-                                    setJustPicked((prev) =>
-                                        prev[f.key]
-                                            ? { ...prev, [f.key]: false }
-                                            : prev
+                                filterOption={false}
+                                onSearch={(x) =>
+                                    setFilterText((prev) => ({
+                                        ...prev,
+                                        [f.key]: x,
+                                    }))
+                                }
+                                options={vmixInputs
+                                    .filter((i) =>
+                                        i.toLowerCase().includes(text)
                                     )
-                                }
-                                options={vmixInputs.map((i) => ({ value: i }))}
-                                filterOption={(input, o) =>
-                                    justPicked[f.key] ||
-                                    String(o?.value ?? '')
-                                        .toLowerCase()
-                                        .includes(input.toLowerCase())
-                                }
+                                    .map((i) => ({ value: i }))}
                                 onChange={(x) => {
                                     setOpt(f.key, x);
-                                    setJustPicked((prev) => ({
+                                    setFilterText((prev) => ({
                                         ...prev,
-                                        [f.key]: true,
+                                        [f.key]: '',
                                     }));
                                 }}
                             />
@@ -425,27 +425,13 @@ function FeedbackRow({
                     />
                 );
             })}
-            <Space size={4}>
-                <Switch
-                    size="small"
-                    checked={feedback.bgColor !== undefined}
-                    onChange={(checked) =>
-                        onChange({
-                            ...feedback,
-                            bgColor: checked ? DEFAULT_BG_COLOR : undefined,
-                        })
-                    }
-                />
-                {feedback.bgColor !== undefined && (
-                    <ColorPicker
-                        value={colorToHex(feedback.bgColor)}
-                        presets={BG_COLOR_PRESETS}
-                        onChange={(_, hex) =>
-                            onChange({ ...feedback, bgColor: hexToColor(hex) })
-                        }
-                    />
-                )}
-            </Space>
+            <ColorPicker
+                value={colorToHex(feedback.bgColor)}
+                presets={BG_COLOR_PRESETS}
+                onChange={(_, hex) =>
+                    onChange({ ...feedback, bgColor: hexToColor(hex) })
+                }
+            />
             <Button
                 type="text"
                 danger
@@ -509,11 +495,19 @@ function ButtonEditor({
             }))
         );
         setFeedbacks(
-            (button?.feedbacks ?? []).map((f) => ({
-                key: defFeedbackFor(f)?.key ?? f.definitionId,
-                options: f.options,
-                bgColor: f.bgColor,
-            }))
+            (button?.feedbacks ?? []).map((f) => {
+                const def = defFeedbackFor(f);
+                // A def with colorOptions carries its color in its own
+                // option(s), not a style override - read it from there.
+                const bgColor = def?.colorOptions
+                    ? (f.options[def.colorOptions[0]] as number | undefined)
+                    : f.bgColor;
+                return {
+                    key: def?.key ?? f.definitionId,
+                    options: f.options,
+                    bgColor: bgColor ?? DEFAULT_BG_COLOR,
+                };
+            })
         );
     }, [open, button]);
 
@@ -709,6 +703,7 @@ function ButtonEditor({
                                         {
                                             key: feedbackDefs[0].key,
                                             options: {},
+                                            bgColor: DEFAULT_BG_COLOR,
                                         },
                                     ])
                                 }
@@ -1116,18 +1111,25 @@ export default function Bitfocus() {
         });
         const resolvedFeedbacks = feedbacks.map((f) => {
             const def = FEEDBACK_DEFS.find((d) => d.key === f.key)!;
+            const options: Record<string, unknown> = {
+                ...Object.fromEntries(
+                    def.fields
+                        .filter((fl) => f.options[fl.key] !== undefined)
+                        .map((fl) => [fl.key, f.options[fl.key]])
+                ),
+                ...def.fixed,
+            };
+            // A def with colorOptions carries the picked color through its
+            // own option(s) instead of a style override (see ActionDef's
+            // colorOptions comment in models/Bitfocus.ts).
+            def.colorOptions?.forEach((k) => {
+                options[k] = f.bgColor;
+            });
             return {
                 definitionId: def.definitionId,
                 connectionId: connectionFor(def.module),
-                options: {
-                    ...Object.fromEntries(
-                        def.fields
-                            .filter((fl) => f.options[fl.key] !== undefined)
-                            .map((fl) => [fl.key, f.options[fl.key]])
-                    ),
-                    ...def.fixed,
-                },
-                bgColor: f.bgColor,
+                options,
+                bgColor: def.colorOptions ? undefined : f.bgColor,
             };
         });
         setSaving('button');
