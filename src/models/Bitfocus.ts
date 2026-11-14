@@ -86,6 +86,21 @@ export interface ActionDef {
     // can stand for several catalog entries (ptzMove is only a preset when
     // functionID is "move to virtual input").
     fixed?: Record<string, string>;
+    // Feedbacks only: native option key(s) the one background-color picker
+    // writes into, instead of a Companion style override. Only a "boolean"
+    // feedback (no options of its own produce a color - xair's mute
+    // feedbacks) can take an arbitrary color through a style override;
+    // Companion requires a "legacy style" feedback's (vmix's tally
+    // feedbacks: type "advanced") override value to be the STRING NAME of
+    // one of the properties its own callback produces (e.g. "bgcolor"), not
+    // a literal color - confirmed against a live button export, where
+    // Companion had already auto-created that exact override pointing at
+    // the string "bgcolor". For those, the only way to carry a literal
+    // color onto the button is through the feedback's own option Companion
+    // already copies from (`bg` on inputLive; `bgPreview`+`bgProgram`, both
+    // set to the same color, on overlayStatus - this editor only offers one
+    // swatch). A def with no colorOptions uses the style override instead.
+    colorOptions?: string[];
 }
 
 // studiocoast-vmix v4.2.0's real overlayFunctions schema: `type` (this
@@ -390,26 +405,31 @@ const MUTE_STATE = [
     { value: '0', label: 'Off' },
 ];
 
+// vMix's general connection-status feedback (generalFeedbacks.ts): one
+// dropdown of named states. "streaming" has its own stream-number sub-field
+// (which stream of up to 5); left out here and fixed to '' (Any), matching
+// this editor's one-field-per-source policy.
+const VMIX_STATUS = [
+    'connection',
+    'fadeToBlack',
+    'recording',
+    'external',
+    'streaming',
+    'multiCorder',
+    'fullscreen',
+    'playList',
+].map((s) => ({ value: s, label: s }));
+
 // Feedback catalog: same shape as an action (ActionDef/ActionField), reusing
 // those types - a feedback is a Companion entity with a definitionId and
 // options, same as an action, just stored in its own list on the button
 // instead of a step's action_sets. Deliberately small (Filip, 2026-11-14):
-// pick a source (what's in program, what overlay is showing, an input/
-// group's mute state) - nothing about text or the other style-override
-// properties Companion's own "Style Overrides" section can already change
-// directly in Companion if wanted.
-//
-// No color field here on any entry, including vmix's own (which does have
-// one): the background color is set the same way for every feedback type,
-// through Companion's generic style-override mechanism (bitfocus.ts
-// setFeedbackColor), not each definition's own options. X-Air's feedbacks
-// have no color option at all, so this is the only way to color those -
-// using it for vmix too keeps every feedback type working the same way
-// (Filip, 2026-11-14: "Just use bitfocus's styling changes for everything
-// to be consistent").
+// pick a source and a background color - nothing about text or the other
+// style-override properties Companion's own "Style Overrides" section can
+// already change directly in Companion if wanted.
 // Verified against the real installed modules: studiocoast-vmix v4.2.0
-// (src/feedbacks/tallyFeedbacks.ts upstream) and behringer-xair v3.0.1
-// (buildStripDefs.js/defStrip.js upstream).
+// (src/feedbacks/tallyFeedbacks.ts, generalFeedbacks.ts upstream) and
+// behringer-xair v3.0.1 (buildStripDefs.js/defStrip.js/index.js upstream).
 export const FEEDBACK_DEFS: ActionDef[] = [
     {
         key: 'studiocoast-vmix:inputLive',
@@ -417,6 +437,7 @@ export const FEEDBACK_DEFS: ActionDef[] = [
         definitionId: 'inputLive',
         label: 'In program',
         fields: [{ key: 'input', label: 'Input', type: 'vmixInput' }],
+        colorOptions: ['bg'],
     },
     {
         key: 'studiocoast-vmix:overlayStatus',
@@ -435,6 +456,19 @@ export const FEEDBACK_DEFS: ActionDef[] = [
                 ],
             },
         ],
+        // One swatch for both; Companion keeps separate preview/program
+        // options, this editor doesn't offer a second color.
+        colorOptions: ['bgPreview', 'bgProgram'],
+    },
+    {
+        key: 'studiocoast-vmix:status',
+        module: 'studiocoast-vmix',
+        definitionId: 'status',
+        label: 'vMix status',
+        fields: [
+            { key: 'status', label: 'Status', type: 'select', options: VMIX_STATUS },
+        ],
+        fixed: { value: '' },
     },
     {
         key: 'behringer-xair:ch',
@@ -454,6 +488,20 @@ export const FEEDBACK_DEFS: ActionDef[] = [
         fields: [
             { key: 'theChannel', label: 'Group', type: 'number' },
             { key: 'state', label: 'When', type: 'select', options: MUTE_STATE },
+        ],
+    },
+    {
+        key: 'behringer-xair:snap_color',
+        module: 'behringer-xair',
+        definitionId: 'snap_color',
+        label: 'Current scene',
+        fields: [
+            {
+                key: 'theSnap',
+                label: 'Scene number',
+                type: 'number',
+                asString: true,
+            },
         ],
     },
 ];
