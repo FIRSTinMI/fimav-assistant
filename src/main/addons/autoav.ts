@@ -631,6 +631,18 @@ export default class AutoAV {
         // Follow the event FMS is set up for
         this.startFmsEventPoll();
 
+        // There is no FMS at an FTC event. FtcScorekeeper is a singleton that
+        // may already be connected with a known event by the time we get
+        // here (e.g. this is a restart) - in that case don't even try the
+        // FMS hub, rather than try-fail-retry on a connection that will never
+        // succeed. On a cold start before FTC is known yet, this is empty
+        // and the hub is still tried once, same as before.
+        if (FtcScorekeeper.Instance.getStatus().eventCode) {
+            this.status.fmsConnected = false;
+            this.emitStatus();
+            return;
+        }
+
         // Build a connection to the SignalR Hub
         this.hubConnection = new HubConnectionBuilder()
             .withUrl('http://10.0.100.5/infrastructureHub')
@@ -809,6 +821,20 @@ export default class AutoAV {
             .catch((err) => {
                 this.status.fmsConnected = false;
                 this.emitStatus();
+
+                // Same reasoning as the pre-connect check above: once FTC is
+                // confirmed, stop treating "no FMS" as an error and stop
+                // retrying forever - it will never succeed.
+                if (this.isFtc()) {
+                    this.logFMS(
+                        'No FMS at this FTC event (expected)',
+                        undefined,
+                        EquipmentLogType.Debug,
+                        false
+                    );
+                    return;
+                }
+
                 this.logFMS(
                     `AutoAV FMS Connection Failed. Restarting...`,
                     err,
