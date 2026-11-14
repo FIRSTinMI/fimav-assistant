@@ -37,6 +37,7 @@ import {
     FMS_BITFOCUS_EVENTS,
     FmsAutomationConfig,
     matchActionDef,
+    migrateLegacyOverlayOptions,
 } from '../../../models/Bitfocus';
 import {
     FTC_UPDATE_LABELS,
@@ -187,6 +188,18 @@ function ActionRow({
     const def = ACTION_DEFS.find((d) => d.key === action.key);
     const setOpt = (k: string, v: unknown) =>
         onChange({ ...action, options: { ...action.options, [k]: v } });
+    // AntD's AutoComplete always runs rc-select in "combobox" mode, which
+    // hard-ignores any `searchValue` prop and derives the filter text from
+    // the current *value* instead (rc-select/BaseSelect.js's mergedSearchValue:
+    // `mode !== 'combobox' ? searchValue : displayValues[0].value`) - so a
+    // `searchValue`/`onSearch` pair here would compile and look like a fix
+    // but never actually affect filtering. The real fix: track "a selection
+    // was just made" per field and have filterOption ignore its `input`
+    // argument entirely while that's true (showing every option), instead
+    // of trying to control what that argument is. onSearch still fires on
+    // real typing (confirmed in rc-select's source) and clears the flag, so
+    // normal substring filtering resumes as soon as the user types again.
+    const [justPicked, setJustPicked] = useState<Record<string, boolean>>({});
     return (
         <div className="bf-action">
             <Select
@@ -217,13 +230,27 @@ function ActionRow({
                                 status={missing ? 'error' : undefined}
                                 placeholder={f.label}
                                 value={(v as string) ?? ''}
+                                onSearch={() =>
+                                    setJustPicked((prev) =>
+                                        prev[f.key]
+                                            ? { ...prev, [f.key]: false }
+                                            : prev
+                                    )
+                                }
                                 options={vmixInputs.map((i) => ({ value: i }))}
                                 filterOption={(input, o) =>
+                                    justPicked[f.key] ||
                                     String(o?.value ?? '')
                                         .toLowerCase()
                                         .includes(input.toLowerCase())
                                 }
-                                onChange={(x) => setOpt(f.key, x)}
+                                onChange={(x) => {
+                                    setOpt(f.key, x);
+                                    setJustPicked((prev) => ({
+                                        ...prev,
+                                        [f.key]: true,
+                                    }));
+                                }}
                             />
                         </Tooltip>
                     );
@@ -305,7 +332,10 @@ function ButtonEditor({
         setActions(
             (button?.actions ?? []).map((a) => ({
                 key: defFor(a)?.key ?? a.definitionId,
-                options: a.options,
+                options:
+                    a.definitionId === 'overlayFunctions'
+                        ? migrateLegacyOverlayOptions(a.options)
+                        : a.options,
             }))
         );
     }, [open, button]);
@@ -486,31 +516,57 @@ function ButtonGrid({
     locked,
     hasTriggers,
     onPick,
+    onPress,
 }: {
     page: CompanionPage;
     // Companion's version has no editor: every button is read only.
     locked: boolean;
     hasTriggers: (_row: number, _column: number) => boolean;
     onPick: (_row: number, _column: number) => void;
+    onPress: (_row: number, _column: number) => void;
 }) {
     const cells = [];
     for (let r = 0; r < page.rows; r += 1) {
         for (let c = 0; c < page.columns; c += 1) {
             const b = page.buttons[`${r}/${c}`];
             cells.push(
-                <button
-                    type="button"
-                    key={`${r}/${c}`}
-                    className={`bf-cell${b ? ' bf-cell--set' : ''}${
-                        b && (locked || !isEditable(b))
-                            ? ' bf-cell--locked'
-                            : ''
-                    }${hasTriggers(r, c) ? ' bf-cell--fms' : ''}`}
-                    title={`${r}/${c}`}
-                    onClick={() => onPick(r, c)}
-                >
-                    {b ? labelToText(b.text) || b.type : ''}
-                </button>
+                <div className="bf-cell-wrap" key={`${r}/${c}`}>
+                    <button
+                        type="button"
+                        className={`bf-cell${b ? ' bf-cell--set' : ''}${
+                            b && (locked || !isEditable(b))
+                                ? ' bf-cell--locked'
+                                : ''
+                        }${hasTriggers(r, c) ? ' bf-cell--fms' : ''}`}
+                        title={`${r}/${c}`}
+                        // A button here presses it (the point of the grid);
+                        // an empty cell has nothing to press, so it opens
+                        // the editor to create one.
+                        onClick={() => (b ? onPress(r, c) : onPick(r, c))}
+                    >
+                        {b ? labelToText(b.text) || b.type : ''}
+                    </button>
+                    {/* An empty cell's main click already opens the editor
+                        (nothing to press), so a pencil there would be a dead
+                        duplicate. Gate on `b`, not `locked` - a locked (old/
+                        unsupported Companion) layout still needs a way to
+                        view an existing button's content/triggers, same as
+                        before this grid defaulted to pressing; the dialog
+                        itself already renders read-only when locked. */}
+                    {b && (
+                        <button
+                            type="button"
+                            className="bf-cell-edit"
+                            title="Edit"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onPick(r, c);
+                            }}
+                        >
+                            ✏️
+                        </button>
+                    )}
+                </div>
             );
         }
     }
@@ -713,6 +769,7 @@ export default function Bitfocus() {
                     }
                 }
             }
+            if (r.op === 'pressButton' && !r.ok) message.error(r.error);
             if (r.op === 'vmixInputs' && r.ok) setVmixInputs(r.data);
             // Any answer for a section ends that section's save.
             if (r.op === 'fms' || r.op === 'customAd') {
@@ -981,6 +1038,14 @@ export default function Bitfocus() {
                                     }
                                     onPick={(row, column) =>
                                         setCell({ row, column })
+                                    }
+                                    onPress={(row, column) =>
+                                        send(
+                                            'bitfocus:pressButton',
+                                            pageNumber,
+                                            row,
+                                            column
+                                        )
                                     }
                                 />
                             )}

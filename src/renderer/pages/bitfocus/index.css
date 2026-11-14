@@ -11,8 +11,15 @@
     gap: 6px;
 }
 
-.bf-cell {
+.bf-cell-wrap {
+    position: relative;
     aspect-ratio: 1;
+    min-width: 0;
+}
+
+.bf-cell {
+    width: 100%;
+    height: 100%;
     min-width: 0;
     border-radius: 6px;
     border: 1px dashed rgba(255, 255, 255, 0.15);
@@ -24,6 +31,27 @@
     overflow: hidden;
     padding: 4px;
     cursor: pointer;
+}
+
+.bf-cell-edit {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    line-height: 1;
+    font-size: 10px;
+    border: none;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.55);
+    color: #fff;
+    cursor: pointer;
+    opacity: 0.55;
+}
+
+.bf-cell-edit:hover {
+    opacity: 1;
 }
 
 .bf-cell--set {

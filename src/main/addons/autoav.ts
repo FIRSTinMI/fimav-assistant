@@ -635,9 +635,18 @@ export default class AutoAV {
         // may already be connected with a known event by the time we get
         // here (e.g. this is a restart) - in that case don't even try the
         // FMS hub, rather than try-fail-retry on a connection that will never
-        // succeed. On a cold start before FTC is known yet, this is empty
+        // succeed. On a cold start before FTC is known yet, this is false
         // and the hub is still tried once, same as before.
-        if (FtcScorekeeper.Instance.getStatus().eventCode) {
+        //
+        // Gated on isFtc() (status.program, same source the catch handler
+        // below and every other FRC/FTC branch in this file already use) -
+        // NOT FtcScorekeeper's raw eventCode, which is set once on first
+        // discovery and never cleared back to null (see ftc-scorekeeper.ts),
+        // so it would stay truthy for the rest of the process even if this
+        // cart is later pointed at a real FRC event. isFtc() tracks the
+        // live/current program (and respects a manual Settings override),
+        // so this gate clears correctly when the program actually changes.
+        if (this.isFtc()) {
             this.status.fmsConnected = false;
             this.emitStatus();
             return;
