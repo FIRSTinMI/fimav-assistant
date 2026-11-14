@@ -5,7 +5,11 @@ import glob from 'glob';
 import log from 'electron-log';
 import AutoAV from './autoav';
 import LiveCaptions from './live-captions';
+import YoutubeUploaderAddon from './upload-helper';
+import AudienceDisplayAddon from './audience-display';
+import FtcScorekeeper from './ftc-scorekeeper';
 import { logsPath } from '../util';
+import { killRunningFfmpeg } from '../cutMatch';
 import HWPing from './hw-ping';
 
 export default class Addons {
@@ -15,40 +19,33 @@ export default class Addons {
 
     private HWPing: HWPing = HWPing.Instance;
 
+    private youtubeUploader: YoutubeUploaderAddon =
+        YoutubeUploaderAddon.Instance;
+
+    private audienceDisplay: AudienceDisplayAddon =
+        AudienceDisplayAddon.Instance;
+
+    private ftcScorekeeper: FtcScorekeeper = FtcScorekeeper.Instance;
+
     public init(): Addons {
         this.restartAll();
         return this;
     }
 
-    // Kill all addons
-    public stop() {
-        this.liveCaptions.stop();
+    // Kill all addons. Resolves once the child-process addons have stopped,
+    // so a quit can wait for the uploader to close its browser and exit.
+    public async stop(): Promise<void> {
         this.AutoAV.stop();
+        // Only here, on quit: AutoAV.stop() also runs for an FMS reconnect,
+        // where a running cut must carry on.
+        killRunningFfmpeg();
         this.HWPing.stop();
-    }
-
-    // Restart live captions
-    public async restartLiveCaptions() {
-        // Stop live captions
-        await this.liveCaptions.stop();
-
-        // Start live captions
-        await this.liveCaptions.start();
-    }
-
-    // Restart AutoAV
-    public restartAutoAV() {
-        // Kill the old thread
-        this.AutoAV.stop();
-
-        // Start a new thread
-        this.AutoAV.start();
-    }
-
-    // Restart HWPing
-    public restartHWPing() {
-        this.HWPing.stop();
-        this.HWPing.start();
+        this.ftcScorekeeper.stop();
+        await Promise.all([
+            this.liveCaptions.stop(),
+            this.youtubeUploader.stop(),
+            this.audienceDisplay.stop(),
+        ]);
     }
 
     // Restart all
@@ -72,6 +69,17 @@ export default class Addons {
 
         // Start hwping
         this.HWPing.start();
+
+        // Start the YouTube uploader (no-ops until an event folder is known;
+        // the Upload tab's Start/Restart re-resolves it once recording begins)
+        this.youtubeUploader.start();
+
+        // Start the custom audience display (off-season only; start() refuses
+        // in-season and the season change in register-events flips it)
+        this.audienceDisplay.start();
+
+        // Connect to the FTC Live scorekeeper if one is set
+        this.ftcScorekeeper.start();
     }
 
     // Manage the logs, removing old and moving old copies to a new folder

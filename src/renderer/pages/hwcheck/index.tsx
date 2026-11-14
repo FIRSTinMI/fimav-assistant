@@ -239,8 +239,10 @@ function HWCheck({ nextStep, previousStep }: Steppable) {
                     </div>
                 )}
 
-                {/* Meanwhile section */}
-                <div>
+                {/* Meanwhile section. The padding is half the row gutter, so
+                    the row's negative margins stay inside the page and add no
+                    horizontal scrollbar. */}
+                <div style={{ padding: '0 12px' }}>
                     <Title level={4} className="hwcheck-meanwhile-title">
                         Meanwhile, locate your AV Tote and orange camera
                         pelican.

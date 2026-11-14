@@ -1,11 +1,18 @@
 /* Custom Styles For StepBar Component */
 
 .step-bar {
-    position: fixed;
-    bottom: 43px;
-    left: 0;
+    /* Sticks to the bottom of the page area instead of floating over it
+       (fixed), and stays inside the page width so it never adds a
+       horizontal scrollbar. */
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    box-sizing: border-box;
     width: 100%;
-    padding-left: 10px;
+    margin: 16px 0 0 !important;
+    padding: 10px 10px;
+    background: #141414;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .step-bar-next-col {

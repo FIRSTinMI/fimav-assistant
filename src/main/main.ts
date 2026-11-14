@@ -1,7 +1,9 @@
 import path from 'path';
-import { app, BrowserWindow, shell, globalShortcut } from 'electron';
+import { app, BrowserWindow, shell, globalShortcut, session } from 'electron';
 import log from 'electron-log';
 import MenuBuilder from './window_components/menu'; // eslint-disable-line import/no-cycle
+import Checks from './checks/engine';
+import { CheckResult, isAlerting } from '../models/Checks';
 import {
     RESOURCES_PATH,
     getAssetPath,
@@ -37,8 +39,11 @@ let mainWindow: BrowserWindow | null = null;
 let appIsQuitting = false;
 const isDebug = isDebugFn();
 
-// Addons
-const addons = new Addons().init();
+// Addons. Only the first instance runs them: a second launch quits at once
+// and must not touch the first one's recordings (cut recovery), processes or
+// ports, so the lock is taken before anything starts.
+const instanceLock = app.requestSingleInstanceLock();
+const addons = instanceLock ? new Addons().init() : null;
 
 if (process.env.NODE_ENV === 'production') {
     const sourceMapSupport = require('source-map-support');
@@ -72,8 +77,9 @@ const createWindow = async () => {
 
     mainWindow = new BrowserWindow({
         show: false,
-        width: 1024,
-        height: 728,
+        width: 1280,
+        height: 820,
+        minWidth: 960,
         icon: getAssetPath('icon.ico'),
         webPreferences: {
             preload: app.isPackaged
@@ -83,6 +89,35 @@ const createWindow = async () => {
     });
 
     mainWindow.loadURL(resolveHtmlPath('index.html'));
+
+    // The Live Captions settings page (served by live-captions on :3000) and
+    // the custom audience display page (:3001) send
+    // X-Frame-Options / a framing CSP that blocks it from loading in the tab's
+    // iframe (white screen). Strip those headers for that origin only so it can
+    // be embedded.
+    session.defaultSession.webRequest.onHeadersReceived(
+        {
+            urls: [
+                'http://localhost:3000/*',
+                'http://127.0.0.1:3000/*',
+                'http://localhost:3001/*',
+                'http://127.0.0.1:3001/*',
+            ],
+        },
+        (details, callback) => {
+            const headers = details.responseHeaders ?? {};
+            Object.keys(headers).forEach((key) => {
+                const lower = key.toLowerCase();
+                if (
+                    lower === 'x-frame-options' ||
+                    lower === 'content-security-policy'
+                ) {
+                    delete headers[key];
+                }
+            });
+            callback({ responseHeaders: headers });
+        }
+    );
 
     mainWindow.on('ready-to-show', () => {
         if (!mainWindow) {
@@ -108,8 +143,12 @@ const createWindow = async () => {
         return true;
     });
 
-    const menuBuilder = new MenuBuilder(mainWindow, addons);
+    const menuBuilder = new MenuBuilder(mainWindow, addons as Addons);
     menuBuilder.buildMenu();
+    // The Checks menu item shows how many checks are failing.
+    Checks.Instance.on('checks', (list: CheckResult[]) =>
+        menuBuilder.setChecksAlerts(list.filter(isAlerting).length)
+    );
 
     // Open urls in the user's browser
     mainWindow.webContents.setWindowOpenHandler((edata) => {
@@ -125,7 +164,7 @@ const createWindow = async () => {
 // eslint-disable-next-line import/prefer-default-export
 export const quitApp = () => {
     appIsQuitting = true;
-    addons.stop();
+    // before-quit stops the addons.
     app.quit();
 };
 
@@ -136,7 +175,38 @@ app.on('window-all-closed', () => {
     // app.quit();
 });
 
-const instanceLock = app.requestSingleInstanceLock();
+// Kill addon child processes (esp. live-captions on port 3000) on EVERY quit
+// path - including electron-updater's relaunch and a menu/OS quit - not just our
+// own quitApp(). Otherwise an orphaned live-captions survives the update and
+// holds the port, which is what caused the recurring blank captions screen.
+// The quit is held until the stops finish (the uploader asks its exe to close
+// its browser first), capped so a wedged addon cannot block the quit.
+let addonsStop: 'idle' | 'stopping' | 'done' = 'idle';
+app.on('before-quit', (event) => {
+    appIsQuitting = true;
+    if (addonsStop === 'done') return;
+    event.preventDefault();
+    if (addonsStop === 'stopping') return;
+    addonsStop = 'stopping';
+    (async () => {
+        try {
+            await Promise.race([
+                // A second instance started nothing, so it stops nothing (the
+                // stops kill addon processes by name, which are the first
+                // instance's).
+                addons ? addons.stop() : Promise.resolve(),
+                new Promise((resolve) => {
+                    setTimeout(resolve, 8000);
+                }),
+            ]);
+        } catch (e) {
+            log.error('Failed to stop addons on quit', e);
+        }
+        addonsStop = 'done';
+        app.quit();
+    })();
+});
+
 if (!instanceLock) {
     // This is a second instance, we only want one at a time
     if (isDebug)

@@ -29,6 +29,26 @@
     white-space: nowrap;
 }
 
+/* The AutoAV line is the one item that shrinks, ending in an ellipsis, so a
+   long message never pushes the status items off the bar. */
+.footer-item {
+    flex-shrink: 0;
+}
+
+.footer-item--log {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.footer-item--log .footer-label {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .footer-icon {
     font-size: 13px;
     display: flex;

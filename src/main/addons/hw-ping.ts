@@ -42,6 +42,17 @@ const pingConfig = {
     timeout: 3,
 };
 
+// The cart switch is at 192.168.25.N9. Some carts still have it at .10N
+// until they are all standardized, so try that when .N9 does not answer.
+export async function probeSwitch(cartNumber: number): Promise<PingResponse> {
+    const n9 = await ping.promise.probe(
+        `192.168.25.${cartNumber}9`,
+        pingConfig
+    );
+    if (n9.alive) return n9;
+    return ping.promise.probe(`192.168.25.10${cartNumber}`, pingConfig);
+}
+
 export default class HWPing {
     private static instance: HWPing;
 
@@ -66,6 +77,9 @@ export default class HWPing {
 
     private lastIpState: IpConfigState = { errors: [], warnings: [] };
 
+    // When the last full round of pings came back; 0 before the first.
+    public lastPingAt = 0;
+
     private emitter: EventEmitter = new EventEmitter();
 
     constructor() {
@@ -76,6 +90,11 @@ export default class HWPing {
         };
 
         this.cartNumber = getCartNumberFromHostname();
+    }
+
+    // The cart's X-Air mixer (192.168.25.<cart>3), or null off a cart.
+    public mixerAddress(): string | null {
+        return this.cartNumber ? `192.168.25.${this.cartNumber}3` : null;
     }
 
     public start() {
@@ -107,7 +126,7 @@ export default class HWPing {
     private async ping() {
         const promises: Promise<any>[] = [
             // Ping switch
-            ping.promise.probe(`192.168.25.10${this.cartNumber}`, pingConfig),
+            probeSwitch(this.cartNumber),
             // Ping PTZ1
             ping.promise.probe(`192.168.25.${this.cartNumber}1`, pingConfig),
             // Ping PTZ2
@@ -132,6 +151,7 @@ export default class HWPing {
 
         // If we got here, no errors
         this.currentState.errors = [];
+        this.lastPingAt = Date.now();
 
         // Iterate over the results and update the state
         let didUpdate = false;
@@ -147,23 +167,23 @@ export default class HWPing {
                     }
                     break;
                 case 1:
-                    if (this.currentState.mixer !== out.alive) {
-                        this.currentState.mixer = out.alive;
-                        this.remoteLog('Mixer', out.alive);
-                        didUpdate = true;
-                    }
-                    break;
-                case 2:
                     if (this.currentState.camera1 !== out.alive) {
                         this.currentState.camera1 = out.alive;
                         this.remoteLog('Camera 1', out.alive);
                         didUpdate = true;
                     }
                     break;
-                case 3:
+                case 2:
                     if (this.currentState.camera2 !== out.alive) {
                         this.currentState.camera2 = out.alive;
                         this.remoteLog('Camera 2', out.alive);
+                        didUpdate = true;
+                    }
+                    break;
+                case 3:
+                    if (this.currentState.mixer !== out.alive) {
+                        this.currentState.mixer = out.alive;
+                        this.remoteLog('Mixer', out.alive);
                         didUpdate = true;
                     }
                     break;

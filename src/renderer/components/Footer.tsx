@@ -43,7 +43,10 @@ export default function AppFooter() {
     return (
         <div className="app-footer">
             {/* AutoAV log */}
-            <span className="footer-item">
+            <span
+                className="footer-item footer-item--log"
+                title={status.auto_av_log ?? undefined}
+            >
                 <Text className="footer-label">
                     AutoAV: {status.auto_av_log ?? 'Unknown'}
                 </Text>
@@ -80,7 +83,7 @@ export default function AppFooter() {
 
             <div className="footer-spacer" />
 
-            {/* IP alert badges — right-aligned */}
+            {/* IP alert badges - right-aligned */}
             {ipErrorCount > 0 && (
                 <span className="footer-alert-badge footer-alert-badge--error">
                     <ExclamationCircleOutlined />

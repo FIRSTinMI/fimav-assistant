@@ -122,18 +122,24 @@ export default class VmixService {
             info.rtmpUrl ??= '';
             info.rtmpKey ??= '';
 
-            await fetch(
-                `${this.settings.baseUrl}?Function=StreamingSetURL&Value=${info.index},${info.rtmpUrl}`,
-                {
-                    headers: this.createHeaders(),
+            // Encoded: a "&" or "#" in a URL or key would cut vMix's Value.
+            const call = async (fn: string, v: string) => {
+                const rsp = await fetch(
+                    `${this.settings.baseUrl}?Function=${fn}&Value=${
+                        info.index
+                    },${encodeURIComponent(v)}`,
+                    {
+                        headers: this.createHeaders(),
+                    }
+                );
+                if (!rsp.ok) {
+                    throw new Error(
+                        `${fn} for stream ${info.index}: HTTP ${rsp.status}`
+                    );
                 }
-            );
-            await fetch(
-                `${this.settings.baseUrl}?Function=StreamingSetKey&Value=${info.index},${info.rtmpKey}`,
-                {
-                    headers: this.createHeaders(),
-                }
-            );
+            };
+            await call('StreamingSetURL', info.rtmpUrl);
+            await call('StreamingSetKey', info.rtmpKey);
         };
 
         const chain = streamInfo.reduce(async (prev, info) => {
@@ -154,9 +160,150 @@ export default class VmixService {
         return chain;
     }
 
+    // List inputs (key + number + title + type) for pickers like the alliance
+    // composite camera selector.
+    async GetInputs(): Promise<
+        { key: string; number: number; title: string; type: string }[]
+    > {
+        const parsed = await this.GetBase();
+        const raw = parsed?.vmix?.inputs?.input;
+        const list = Array.isArray(raw) ? raw : [raw].filter(Boolean);
+        return list.map((i: any) => ({
+            key: i.key,
+            number: Number(i.number),
+            title: i.title,
+            type: i.type,
+        }));
+    }
+
+    // Host vMix runs on, from the API address (for its TCP API on 8099).
+    Host(): string {
+        try {
+            return new URL(this.settings.baseUrl).hostname;
+        } catch {
+            return '127.0.0.1';
+        }
+    }
+
+    // Run one vMix API function, e.g. ('AudioOn', { Input: key }). Throws
+    // when vMix rejects it.
+    async Function(fn: string, params: Record<string, string> = {}) {
+        const q = Object.entries(params)
+            .map(([k, v]) => `&${k}=${encodeURIComponent(v)}`)
+            .join('');
+        const rsp = await fetch(`${this.settings.baseUrl}?Function=${fn}${q}`, {
+            headers: this.createHeaders(),
+            signal: AbortSignal.timeout(5_000),
+        });
+        if (!rsp.ok) throw new Error(`vMix ${fn}: ${rsp.status}`);
+    }
+
+    private vmixCall(inputKey: string, fn: string, value: string) {
+        return fetch(
+            `${this.settings.baseUrl}?Function=${fn}&Input=${encodeURIComponent(
+                inputKey
+            )}&Value=${encodeURIComponent(value)}`,
+            { headers: this.createHeaders() }
+        );
+    }
+
+    async AddColourInput(): Promise<void> {
+        // vMix needs the pipe + hex colour: "Colour|#RRGGBB". Bare "Colour" is
+        // rejected and silently adds nothing.
+        await fetch(
+            `${
+                this.settings.baseUrl
+            }?Function=AddInput&Value=${encodeURIComponent('Colour|#000000')}`,
+            { headers: this.createHeaders() }
+        );
+    }
+
+    // Create (or reuse) a dedicated "Alliance Selection Composite" input built
+    // the way the custom AD does it: a blank colour input as the base (layer 0),
+    // the EXISTING FMS/audience-display input as layer 1 (full frame), and the
+    // selected camera as layer 2, positioned at the alliance-selection camera
+    // box. The operator's own FMS/camera inputs are referenced as layers, not
+    // duplicated. vMix 27+ SetLayer<N>Zoom/PanX/PanY does the positioning.
+    async CreateAllianceComposite(
+        fmsKey: string,
+        cameraKey: string,
+        zoom: number,
+        panX: number,
+        panY: number
+    ): Promise<string> {
+        const NAME = 'Alliance Selection Composite';
+        let inputs = await this.GetInputs();
+        let comp = inputs.find((i) => i.title === NAME);
+
+        if (!comp) {
+            const before = new Set(inputs.map((i) => i.key));
+            await this.AddColourInput();
+            // vMix registers the new input asynchronously; poll briefly for it.
+            let added;
+            for (let attempt = 0; attempt < 6 && !added; attempt += 1) {
+                // eslint-disable-next-line no-await-in-loop
+                await new Promise((resolve) => {
+                    setTimeout(resolve, 300);
+                });
+                // eslint-disable-next-line no-await-in-loop
+                inputs = await this.GetInputs();
+                added = inputs.find((i) => !before.has(i.key));
+            }
+            if (!added)
+                throw new Error(
+                    'vMix did not add the colour input (check the vMix API is reachable)'
+                );
+            await this.RenameInput(added.key, NAME);
+            inputs = await this.GetInputs();
+            comp = inputs.find((i) => i.title === NAME) ?? added;
+        }
+        if (!comp) throw new Error('Could not create the composite input');
+
+        // Assign the layers. SetMultiViewOverlay places an input onto a layer of
+        // the target input (Value = "<layer>,<inputKey>"); MultiViewOverlay is
+        // only a visibility toggle and takes just the layer number, which is why
+        // the earlier attempt created the input but left it empty.
+        // Layer 1 = FMS/AD (full frame), Layer 2 = camera (positioned).
+        await this.vmixCall(comp.key, 'SetMultiViewOverlay', `1,${fmsKey}`);
+        await this.vmixCall(comp.key, 'SetMultiViewOverlay', `2,${cameraKey}`);
+        await this.vmixCall(comp.key, 'SetLayer2Zoom', String(zoom));
+        await this.vmixCall(comp.key, 'SetLayer2PanX', String(panX));
+        await this.vmixCall(comp.key, 'SetLayer2PanY', String(panY));
+        return comp.key;
+    }
+
+    // Fetch vMix's configured recording folder so the Auto AV tab can show the
+    // exact save path before any recording. vMix reports the record destination
+    // as recording.filename1 (the directory it will write into).
+    async GetRecordingFolder(): Promise<string | null> {
+        const parsed = await this.GetBase();
+        const rec = parsed?.vmix?.recording;
+        // Attributes surface as properties (attributeNamePrefix: '').
+        const file = rec?.filename1 ?? rec?.filename ?? rec?.setup;
+        if (typeof file === 'string' && file.trim()) {
+            const idx = Math.max(file.lastIndexOf('\\'), file.lastIndexOf('/'));
+            return idx > 0 ? file.slice(0, idx) : file;
+        }
+        return null;
+    }
+
+    // Reload a browser input by its (renamed) title, e.g. after live-captions
+    // updated so the embedded page picks up the new build.
+    async ReloadBrowserInput(name: string): Promise<void> {
+        await fetch(
+            `${
+                this.settings.baseUrl
+            }?Function=BrowserReload&Input=${encodeURIComponent(name)}`,
+            { headers: this.createHeaders() }
+        );
+    }
+
     async AddBrowserInput(url: string): Promise<void> {
         await fetch(
-            `${this.settings.baseUrl}?Function=AddInput&Value=Browser|${url}`,
+            // Encoded: an "&" in the page's own query would end vMix's Value.
+            `${
+                this.settings.baseUrl
+            }?Function=AddInput&Value=${encodeURIComponent(`Browser|${url}`)}`,
             {
                 headers: this.createHeaders(),
             }
@@ -186,6 +333,48 @@ export default class VmixService {
         });
     }
 
+    // Add a browser input pointing at the given URL, then rename the freshly
+    // created input. The new input is the Browser input that was not there
+    // before (vMix's own title, "Browser <host>", varies with the port).
+    // Returns the input key, or null if it couldn't be found afterwards.
+    private async addBrowserInputNamed(
+        url: string,
+        _host: string,
+        name: string
+    ): Promise<string | null> {
+        const keys = async (): Promise<any[]> => {
+            const parsed = await this.GetBase();
+            const inputs = parsed?.vmix?.inputs?.input;
+            return Array.isArray(inputs) ? inputs : [inputs].filter(Boolean);
+        };
+        const before = new Set((await keys()).map((i: any) => i?.key));
+        await this.AddBrowserInput(url);
+        const match = (await keys()).find(
+            (input: any) => input?.type === 'Browser' && !before.has(input?.key)
+        );
+        if (!match) return null;
+        await this.RenameInput(match.key, name);
+        return match.key;
+    }
+
+    async AddLiveCaptionsInput(): Promise<void> {
+        const key = await this.addBrowserInputNamed(
+            'http://127.0.0.1:3000/',
+            '127.0.0.1',
+            'Live Captions'
+        );
+        if (!key) throw new Error('Could not find the new Live Captions input');
+    }
+
+    // The audience display browser input: the FMS display or our custom one
+    // at FRC events ("FMS", the name the custom display and FIM's Companion
+    // profiles use), FTC Live's display at FTC events ("Audience Display").
+    async AddAudienceDisplayInput(url: string, name: string): Promise<void> {
+        const key = await this.addBrowserInputNamed(url, '', name);
+        if (!key) throw new Error(`Could not find the new ${name} input`);
+        await this.SetInputAudioAlwaysOn(key);
+    }
+
     async GetBase(): Promise<any> {
         return fetch(`${this.settings.baseUrl}`, {
             headers: this.createHeaders(),
@@ -210,6 +399,17 @@ export default class VmixService {
     async isRecording(): Promise<boolean> {
         return this.GetBase().then((parsed) => {
             return parsed.vmix.recording['#text'] === 'True';
+        });
+    }
+
+    async isStreaming(): Promise<boolean> {
+        return this.GetBase().then((parsed) => {
+            // vMix reports streaming the same shape as recording. It exposes
+            // on/off only - never the key/URL or bandwidth.
+            const s = parsed?.vmix?.streaming;
+            if (s === undefined || s === null) return false;
+            const text = typeof s === 'object' ? s['#text'] : s;
+            return text === 'True' || text === true;
         });
     }
 
