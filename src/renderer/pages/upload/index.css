@@ -1,0 +1,18 @@
+.upload-page {
+    padding: 16px 20px 24px;
+    text-align: left;
+}
+
+.upload-account {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 4px;
+}
+
+.upload-page .file-name,
+.ant-modal .file-name {
+    font-family: 'Courier New', monospace;
+    word-break: break-all;
+}

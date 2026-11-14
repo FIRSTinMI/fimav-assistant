@@ -1,0 +1,38 @@
+.checks-page {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+        'Helvetica Neue', Arial, sans-serif;
+    padding: 4px 0;
+}
+
+.checks-group {
+    margin-bottom: 20px;
+}
+
+.checks-group h3 {
+    margin: 0 0 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.check-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 220px) 150px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.check-row__detail {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.check-row__action {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}

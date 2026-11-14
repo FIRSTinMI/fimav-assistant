@@ -43,7 +43,7 @@ jobs:
             - name: Install Node.js and NPM
               uses: actions/setup-node@v3
               with:
-                  node-version: 18
+                  node-version: 22
                   cache: npm
 
             - name: npm install
@@ -58,3 +58,24 @@ jobs:
                   npm run lint
                   npm exec tsc
                   # npm test
+
+            # Launch the packaged app on Windows, open every tab, fail on any renderer
+            # error. Proves an Electron upgrade on the OS the carts run.
+            - name: Smoke test packaged app
+              if: matrix.os == 'windows-latest'
+              shell: pwsh
+              run: |
+                  npm install --no-save playwright@1.64.1
+                  node .erb/scripts/smoke-electron.mjs "release/build/win-unpacked/FIMAV Assistant.exe"
+
+            # Surface the built Windows installer so a branch build can be
+            # installed on an AV PC before it is released. This only
+            # captures the exe the windows build already produces; it does not
+            # change how the app is built.
+            - name: Upload Windows installer
+              if: matrix.os == 'windows-latest'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: fimav-assistant-setup
+                  path: release/build/*.exe
+                  if-no-files-found: error

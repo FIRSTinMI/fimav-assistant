@@ -1,0 +1,126 @@
+.bf-page {
+    padding: 16px 20px 24px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.bf-grid {
+    display: grid;
+    gap: 6px;
+}
+
+.bf-cell-wrap {
+    position: relative;
+    aspect-ratio: 1;
+    min-width: 0;
+}
+
+.bf-cell {
+    /* The border never changes width between states (set/locked/hover all
+       keep 1px, only style/color move) and the box itself is sized to
+       include it, so a state change never resizes the box or the live
+       preview image filling it - only the border's own look changes. */
+    box-sizing: border-box;
+    background-origin: border-box;
+    background-clip: border-box;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    border-radius: 6px;
+    border: 1px dashed rgba(255, 255, 255, 0.15);
+    background-color: transparent;
+    color: inherit;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: pre-line;
+    overflow: hidden;
+    padding: 4px;
+    cursor: pointer;
+}
+
+.bf-cell-edit {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+    font-size: 15px;
+    border: none;
+    background: transparent;
+    color: #fff;
+    cursor: pointer;
+    opacity: 0.6;
+}
+
+.bf-cell-edit:hover {
+    opacity: 1;
+}
+
+.bf-cell--set {
+    border-style: solid;
+    border-color: rgba(255, 255, 255, 0.25);
+    /* background-color only, never the `background` shorthand - that resets
+       background-origin/-clip to their initial padding-box, which would
+       size a preview image to inside the border instead of the full box
+       the base rule sets them to. */
+    background-color: rgba(255, 255, 255, 0.06);
+    font-weight: 600;
+}
+
+.bf-cell--locked {
+    border-color: #d4b106;
+}
+
+.bf-cell:hover {
+    border-color: #1677ff;
+}
+
+.bf-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+}
+
+.bf-action {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    align-items: center;
+}
+
+.bf-readonly {
+    margin-top: 8px;
+}
+
+.bf-trigger-head {
+    margin-bottom: 12px;
+}
+
+.bf-address {
+    width: 320px;
+}
+
+.bf-event {
+    width: 200px;
+}
+
+.bf-add {
+    margin-top: 8px;
+}
+
+.bf-sink + .bf-sink {
+    margin-top: 16px;
+}
+
+.bf-cell--fms {
+    outline: 2px solid #1677ff;
+    outline-offset: 2px;
+}

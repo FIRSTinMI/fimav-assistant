@@ -9,7 +9,7 @@ import { networkInterfaces, hostname, NetworkInterfaceInfo } from 'os';
 import path from 'path';
 import ping from 'ping';
 import { elevatedPSCommand, psCommand } from '../util';
-import HWPing from '../addons/hw-ping';
+import HWPing, { probeSwitch } from '../addons/hw-ping';
 
 const SoundVolumeViewPath =
     process.env.NODE_ENV === 'production'
@@ -204,15 +204,16 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
     if (resp.av_ip_ready) {
         // Ping on-cart devices
         const promises = [
-            // TODO: Ensure these are the right IPs
+            // Cart addressing: switch .N9 (falling back to .10N), PTZ1 .N1,
+            // PTZ2 .N2, mixer .N3.
             // Ping switch
-            ping.promise.probe(`192.168.25.10${cartNumber}`, pingConfig),
+            probeSwitch(cartNumber),
             // Ping mixer
-            ping.promise.probe(`192.168.25.${cartNumber}2`, pingConfig),
-            // Ping PTZ1
             ping.promise.probe(`192.168.25.${cartNumber}3`, pingConfig),
+            // Ping PTZ1
+            ping.promise.probe(`192.168.25.${cartNumber}1`, pingConfig),
             // Ping PTZ2
-            ping.promise.probe(`192.168.25.${cartNumber}4`, pingConfig),
+            ping.promise.probe(`192.168.25.${cartNumber}2`, pingConfig),
         ];
 
         // Wait for all pings to finish
@@ -268,10 +269,8 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
         }
     );
 
-    // Ensure that "OUT 1-2" of "BEHRINGER X-AIR" is the default, is unmuted, and the volume is over 75%
-    const xAirIndex = resp.audio_devices_found.findIndex(
-        (a) => a.name === 'OUT 1-2' && a.sub_name.includes('BEHRINGER X-AIR')
-    );
+    // Ensure that "OUT 1-2" of "BEHRINGER X-AIR" is the default, is unmuted, and the volume is 100%
+    const xAirIndex = resp.audio_devices_found.findIndex(isXairOut);
     const xAir = resp.audio_devices_found[xAirIndex];
 
     if (!xAir) {
@@ -321,15 +320,15 @@ export default async function HWCheck(): Promise<HWCheckResponse> {
             await setVolumePercent(xAir.name, 100)
                 .then(() => {
                     resp.logs.push(
-                        `Set BEHRINGER X-AIR 'OUT 1-2' volume to 75%`
+                        `Set BEHRINGER X-AIR 'OUT 1-2' volume to 100%`
                     );
                     resp.audio_devices_found[xAirIndex].volume_percent =
-                        '75.0%';
+                        '100.0%';
                     return undefined;
                 })
                 .catch((err) => {
                     resp.errors.push(
-                        `Could not set BEHRINGER X-AIR 'OUT 1-2' volume to 75%.  Please set it from the task bar.`
+                        `Could not set BEHRINGER X-AIR 'OUT 1-2' volume to 100%.  Please set it from the task bar.`
                     );
                     log.error('Could not set volume: ', err);
                     resp.audio_ready = false;
@@ -500,6 +499,11 @@ function getIntefaceStaticInfo(
         });
 }
 
+// The X-Air's "OUT 1-2" playback device: what Windows plays the match
+// sounds (the audience display browser) through.
+export const isXairOut = (a: { name: string; sub_name: string }) =>
+    a.name === 'OUT 1-2' && a.sub_name.includes('BEHRINGER X-AIR');
+
 /*
  * Fetch and parse audio devices
  *   log: Electron log instance
@@ -538,12 +542,37 @@ async function getAudioDevices(
     return new Promise((resolve) => {
         // Run .\SoundVolumeView.exe /Sjson
         const proc = spawn(SoundVolumeViewPath, ['/Sjson']);
+        // Missing (e.g. quarantined) or hung exe: resolve empty rather than
+        // throw an unhandled 'error' or never settle. The checks call this
+        // every minute and wait on it.
+        //
+        // proc.kill() alone is not enough: a SoundVolumeView instance stuck
+        // in a kernel-mode wait (confirmed 2026-11-13 - Stop-Process -Force
+        // and taskkill /F both "succeed" with no error yet the process never
+        // actually dies) never fires 'exit', so the timeout must resolve the
+        // promise itself rather than only attempt to kill and wait for exit
+        // - otherwise every check after this one in the tick hangs forever,
+        // and since ticks chain on one one-at-a-time promise, so does every
+        // later tick. If 'exit' does eventually fire after this (a slow but
+        // real kill), its resolve(...) below is a harmless no-op - a
+        // Promise only honours the first settle.
+        const timer = setTimeout(() => {
+            log.warn('SoundVolumeView did not exit in 10s, giving up on it');
+            proc.kill();
+            resolve([]);
+        }, 10000);
+        proc.on('error', (err) => {
+            clearTimeout(timer);
+            log.error('SoundVolumeView failed to start: ', err);
+            resolve([]);
+        });
         let buffer = Buffer.from('');
         proc.stdout?.on('data', (data) => {
             buffer = Buffer.concat([buffer, data]);
         });
 
         proc.on('exit', () => {
+            clearTimeout(timer);
             // Buffer to string
             let str = buffer.toString();
 
@@ -637,13 +666,27 @@ async function runSetSoundCommand(
     return new Promise((resolve, reject) => {
         // Spawn the process
         const proc = spawn(SoundVolumeViewPath, [cmd, ...params]);
+        // A hung exe must not leave the caller waiting forever. Same fix as
+        // getAudioDevices above: proc.kill() alone is not enough for one
+        // stuck in a kernel-mode wait (confirmed 2026-11-13 - it survives
+        // Stop-Process -Force and taskkill /F with no error and never fires
+        // 'exit'), so the timeout must settle the promise itself. If 'exit'
+        // or 'error' still fire after this (a slow but real kill), their
+        // resolve/reject below are a harmless no-op - a Promise only
+        // honours the first settle.
+        const timer = setTimeout(() => {
+            proc.kill();
+            resolve(false);
+        }, 10000);
         // Listen for exit
         proc.on('exit', () => {
+            clearTimeout(timer);
             resolve(true);
         });
 
         // Listen for error
         proc.on('error', (err) => {
+            clearTimeout(timer);
             reject(err);
         });
     });
